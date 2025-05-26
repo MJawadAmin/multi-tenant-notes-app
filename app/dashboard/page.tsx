@@ -52,7 +52,7 @@ export default function Dashboard() {
           Welcome, <span className="text-green-600">{username}</span> 👋
         </h1>
         <p className="text-gray-600">
-          This is your dashboard. Explore features and manage your account here.
+          This is your dashboard. Explore features and manage your account here. 
         </p>
       </motion.div>
     </div>

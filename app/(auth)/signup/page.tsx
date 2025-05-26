@@ -109,7 +109,7 @@ export default function SignUpPage() {
 
         <button
           onClick={handleSignUp}
-          className="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-xl transition"
+          className="mt-6 w-full bg-sky-600 hover:bg-sky-300 text-white font-semibold py-2 rounded-xl transition"
         >
           Sign Up
         </button>

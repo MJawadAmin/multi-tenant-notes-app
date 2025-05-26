@@ -1,56 +1,93 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react'; // Optional: install lucide-react
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const router = useRouter();
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
-    } else {
-      router.push('/dashboard');
+    if (email === '' || password === '') {
+      setError('Email and password are required.');
+      return;
     }
+
+    setError('');
+    router.push('/dashboard');
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 mt-20 bg-white shadow rounded-xl">
-      <h2 className="text-2xl font-semibold mb-4">Login</h2>
-      {error && <p className="text-red-500">{error}</p>}
-      <input
-        type="email"
-        className="border p-2 w-full mb-3"
-        placeholder="Email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        className="border p-2 w-full mb-3"
-        placeholder="Password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <button className="bg-blue-600 text-white py-2 px-4 rounded w-full" onClick={handleLogin}>
-        Login
-      </button>
-      <div className="text-sm text-center mt-4 space-y-1">
-        <p>
-          Forgot your password?{' '}
-          <a className="text-blue-600 underline" href="/reset-password">
-            Reset
-          </a>
-        </p>
-        <p>
-          Don't have an account?{' '}
-          <a className="text-blue-600 underline" href="/signup">
-            Sign Up
-          </a>
-        </p>
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Left Side - Login Form */}
+      <div className="w-full md:w-1/2 bg-[#0e131f] text-white flex items-center justify-center p-8 relative">
+        {/* Back Arrow */}
+        <button
+          onClick={() => router.push('/')}
+          className="absolute top-6 left-6 text-white hover:text-indigo-400 transition"
+          aria-label="Back to Home"
+        >
+          <ArrowLeft size={24} />
+        </button>
+
+        <div className="w-full max-w-md">
+          <h1 className="text-4xl font-bold mb-8">Log in</h1>
+
+          {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+
+          <div className="space-y-4">
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2 rounded-md bg-[#0e131f] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 rounded-md bg-[#0e131f] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+
+            <div className="flex justify-between text-sm text-gray-400">
+              <a href="/reset-password" className="hover:underline">
+                Forgot password?
+              </a>
+            </div>
+
+            <button
+              onClick={handleLogin}
+              className="w-full py-2 rounded-md bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold hover:opacity-90 transition"
+            >
+              Log in
+            </button>
+          </div>
+
+          <div className="text-sm text-gray-400 mt-6 text-center">
+            Don’t have an account?{' '}
+            <a href="/signup" className="text-indigo-500 underline">
+              Sign up
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Illustration */}
+      <div className="hidden md:flex w-full md:w-1/2 bg-[#0e131f] items-center justify-center relative p-6">
+        <Image
+          src="/book.avif"
+          alt="Writer Illustration"
+          width={1200}
+          height={1200}
+          className="object-contain rounded-xl shadow-lg"
+        />
       </div>
     </div>
   );
