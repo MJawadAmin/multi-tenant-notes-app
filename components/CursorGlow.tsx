@@ -7,7 +7,6 @@ export default function CursorGlow() {
 
   useEffect(() => {
     const glow = glowRef.current;
-
     if (!glow) return;
 
     let mouseX = 0;
@@ -45,10 +44,10 @@ export default function CursorGlow() {
   return (
     <div
       ref={glowRef}
-      className="pointer-events-none fixed top-0 left-0 z-[9999] h-[50px] w-[50px] rounded-full"
+      className="fixed top-0 left-0 z-[9999] h-[50px] w-[50px] rounded-full pointer-events-none"
       style={{
-        background: 'radial-gradient(circle, radial-gradient(circle, rgb(58,140,91) 0%, rgb(58,140,91) 40%, rgb(58,140,91) 70%, rgb(58,140,91) 100%), transparent)',
-        backdropFilter: 'blur(0px)',
+        background:
+          'radial-gradient(circle, rgba(58,140,91,0.60) 0%, rgba(58,140,91,0.30) 40%, rgba(58,140,91,0.05) 70%, rgba(58,140,91,0) 100%)',
         mixBlendMode: 'difference',
         transition: 'width 0.2s ease, height 0.2s ease',
       }}

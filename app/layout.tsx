@@ -13,7 +13,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} relative overflow-hidden bg-gray-50 text-gray-800 cursor-none`}>
+      <body className={`${inter.className} relative overflow-hidden bg-gray-50 text-gray-800`}>
         <CursorGlow />
         {children}
       </body>

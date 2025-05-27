@@ -30,7 +30,7 @@ body {
 
 /* Optional: for global control if not using inline styles */
 .cursor-glow {
-  pointer-events: none;
+
   position: fixed;
   z-index: 9999;
   border-radius: 9999px;
