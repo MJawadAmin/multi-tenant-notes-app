@@ -4,53 +4,65 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { ToastContainer, toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
+import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import 'react-toastify/dist/ReactToastify.css';
 import { supabase } from '@/lib/supabase';
 
 export default function SignupPage() {
   const router = useRouter();
+
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [role, setRole] = useState('user');
+  const [organizationSlug, setOrganizationSlug] = useState('default-org');
 
   const handleSignup = async () => {
-    if (!username || !phone || !email || !password || !confirmPassword) {
-      setError('All fields are required.');
+    if (!email || !password || !username || !phone || !organizationSlug) {
+      toast.error('Please fill in all fields');
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match..');
+      toast.error('Passwords do not match');
       return;
     }
 
-    setError('');
-
-    const { data, error: signupError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          username,
-          phone,
-        },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-      },
     });
 
-    if (signupError) {
-      setError(signupError.message);
+    if (signUpError || !signUpData.user) {
+      toast.error(signUpError?.message || 'Signup failed');
       return;
     }
 
-    // User must verify email before logging in
-    toast.success('Check your email to confirm your account!');
+    const userId = signUpData.user.id;
+
+    const { error: insertError } = await supabase.from('users').insert([
+      {
+        id: userId,
+        email,
+        username,
+        phone,
+        role,
+        organization_slug: organizationSlug,
+      },
+    ]);
+
+    if (insertError) {
+      toast.error('Failed to save user data');
+      return;
+    }
+
+    toast.success('Signup successful!');
+    router.push('/dashboard');
   };
 
   return (
@@ -87,16 +99,6 @@ export default function SignupPage() {
           >
             Sign up
           </motion.h1>
-
-          {error && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-red-400 text-sm mb-4 text-center"
-            >
-              {error}
-            </motion.p>
-          )}
 
           <motion.div
             initial="hidden"
@@ -152,7 +154,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-800 hover:text-gray-500"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -170,6 +172,25 @@ export default function SignupPage() {
                 className="w-full px-4 py-3 pr-10 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </motion.div>
+
+            <motion.select
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </motion.select>
+
+            <motion.input
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+              type="text"
+              placeholder="Organization Slug"
+              value={organizationSlug}
+              onChange={(e) => setOrganizationSlug(e.target.value)}
+              className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
 
             <motion.button
               variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}

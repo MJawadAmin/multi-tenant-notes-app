@@ -27,3 +27,15 @@ body {
 .input-style {
   @apply w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400;
 }
+
+/* Optional: for global control if not using inline styles */
+.cursor-glow {
+  pointer-events: none;
+  position: fixed;
+  z-index: 9999;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255,255,255,0.1), transparent);
+  backdrop-filter: blur(2px);
+  mix-blend-mode: difference;
+  transition: width 0.2s ease, height 0.2s ease;
+}

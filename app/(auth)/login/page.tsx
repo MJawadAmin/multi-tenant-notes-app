@@ -16,13 +16,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-const handleLogin = async () => {
-  if (email === '' || password === '') {
+
+  const handleLogin = async () => {
+  if (!email || !password) {
     setError('Email and password are required.');
     return;
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data: loginData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -33,21 +34,28 @@ const handleLogin = async () => {
     return;
   }
 
+  // Fetch the user's role and org slug from your users table
+  const {
+    data: userData,
+    error: userError,
+  } = await supabase
+    .from('users') // your custom user table
+    .select('role, org_slug')
+    .eq('email', email)
+    .single();
+
+  if (userError || !userData) {
+    toast.error('User role or organization not found.');
+    return;
+  }
+
+  const { role, org_slug } = userData;
+
   toast.success('Logged in successfully!');
   setTimeout(() => {
-    router.push('/dashboard');
+    router.push(`/app/(protected)/${org_slug}/dashboard/${role}`);
   }, 1000);
 };
-useEffect(() => {
-  const checkUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      router.push('/dashboard'); // already logged in
-    }
-  };
-  checkUser();
-}, []);
-
 
   return (
     <div className="relative min-h-screen w-full">
