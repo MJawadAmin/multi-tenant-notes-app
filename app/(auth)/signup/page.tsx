@@ -26,7 +26,7 @@ export default function SignupPage() {
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('Passwords do not match..');
       return;
     }
 
