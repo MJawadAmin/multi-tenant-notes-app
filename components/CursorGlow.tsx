@@ -8,7 +8,7 @@ export default function CursorGlow() {
   useEffect(() => {
     const glow = glowRef.current;
     if (!glow) return;
-
+    
     let mouseX = 0;
     let mouseY = 0;
 
