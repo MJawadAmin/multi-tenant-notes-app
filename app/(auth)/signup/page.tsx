@@ -50,7 +50,7 @@ export default function SignupPage() {
     }
 
     // User must verify email before logging in
-    toast.success('Check your email to confirm your account!');
+    toast.success('Check your email to confirm your account!!');
   };
 
   return (
