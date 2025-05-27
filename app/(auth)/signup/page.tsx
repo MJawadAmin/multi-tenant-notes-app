@@ -7,6 +7,7 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import 'react-toastify/dist/ReactToastify.css';
+import { supabase } from '@/lib/supabase';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -30,10 +31,26 @@ export default function SignupPage() {
     }
 
     setError('');
-    toast.success('Account created successfully!');
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 1000);
+
+    const { data, error: signupError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+          phone,
+        },
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    if (signupError) {
+      setError(signupError.message);
+      return;
+    }
+
+    // User must verify email before logging in
+    toast.success('Check your email to confirm your account!');
   };
 
   return (
@@ -94,12 +111,8 @@ export default function SignupPage() {
             }}
             className="space-y-4"
           >
-            {/* Username */}
             <motion.input
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 },
-              }}
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               type="text"
               placeholder="Username"
               value={username}
@@ -107,12 +120,8 @@ export default function SignupPage() {
               className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
 
-            {/* Phone Number */}
             <motion.input
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 },
-              }}
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               type="tel"
               placeholder="Phone Number"
               value={phone}
@@ -120,12 +129,8 @@ export default function SignupPage() {
               className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
 
-            {/* Email */}
             <motion.input
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 },
-              }}
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               type="email"
               placeholder="Email"
               value={email}
@@ -133,12 +138,8 @@ export default function SignupPage() {
               className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
 
-            {/* Password */}
             <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 },
-              }}
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               className="relative"
             >
               <input
@@ -151,18 +152,14 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-800 hover:text-gray-500"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </motion.div>
 
-            {/* Confirm Password */}
             <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 },
-              }}
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               className="relative"
             >
               <input
@@ -174,12 +171,8 @@ export default function SignupPage() {
               />
             </motion.div>
 
-            {/* Signup Button */}
             <motion.button
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                visible: { opacity: 1, y: 0 },
-              }}
+              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               onClick={handleSignup}
               className="w-full py-3 rounded-md bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold hover:opacity-90 transition"
             >
@@ -187,7 +180,6 @@ export default function SignupPage() {
             </motion.button>
           </motion.div>
 
-          {/* Login Link */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

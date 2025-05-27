@@ -7,6 +7,8 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import 'react-toastify/dist/ReactToastify.css';
+import {supabase } from '@/lib/supabase'; // Ensure you have supabase client set up
+import { useEffect } from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,19 +16,38 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+const handleLogin = async () => {
+  if (email === '' || password === '') {
+    setError('Email and password are required.');
+    return;
+  }
 
-  const handleLogin = async () => {
-    if (email === '' || password === '') {
-      setError('Email and password are required.');
-      return;
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    setError(error.message);
+    toast.error('Login failed: ' + error.message);
+    return;
+  }
+
+  toast.success('Logged in successfully!');
+  setTimeout(() => {
+    router.push('/dashboard');
+  }, 1000);
+};
+useEffect(() => {
+  const checkUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      router.push('/dashboard'); // already logged in
     }
-
-    setError('');
-    toast.success('Logged in successfully!');
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 1000);
   };
+  checkUser();
+}, []);
+
 
   return (
     <div className="relative min-h-screen w-full">
@@ -127,7 +148,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-800 hover:text-gray-500"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
