@@ -21,7 +21,7 @@ export default function SignupPage() {
 
   const handleSignup = async () => {
     if (!username || !phone || !email || !password || !confirmPassword) {
-      setError('All fields are required.');
+      setError('All fields are required..');
       return;
     }
 
