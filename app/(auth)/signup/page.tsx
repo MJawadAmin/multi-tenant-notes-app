@@ -14,12 +14,18 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   const handleSignup = async () => {
-    if (!username || !phone || !email || !password) {
+    if (!username || !phone || !email || !password || !confirmPassword) {
       setError('All fields are required.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
@@ -32,10 +38,7 @@ export default function SignupPage() {
 
   return (
     <div className="relative min-h-screen w-full">
-      {/* Toastify */}
       <ToastContainer position="top-right" autoClose={3000} />
-
-      {/* Background Image */}
       <Image
         src="/book.png"
         alt="Background"
@@ -43,22 +46,16 @@ export default function SignupPage() {
         priority
         className="object-cover"
       />
-
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* Content */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
-        {/* Back Arrow */}
         <button
           onClick={() => router.push('/')}
           className="absolute top-6 left-6 text-white hover:text-indigo-400 transition"
-          aria-label="Back to Home"
         >
           <ArrowLeft size={24} />
         </button>
 
-        {/* Animated Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -158,6 +155,23 @@ export default function SignupPage() {
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
+            </motion.div>
+
+            {/* Confirm Password */}
+            <motion.div
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                visible: { opacity: 1, y: 0 },
+              }}
+              className="relative"
+            >
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-10 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </motion.div>
 
             {/* Signup Button */}
