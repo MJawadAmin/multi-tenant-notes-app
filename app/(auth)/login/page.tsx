@@ -4,67 +4,96 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-hot-toast'; // Changed from 'react-toastify' to 'react-hot-toast'
 import { motion } from 'framer-motion';
-import 'react-toastify/dist/ReactToastify.css';
-import {supabase } from '@/lib/supabase'; // Ensure you have supabase client set up
-import { useEffect } from 'react';
+// No need for 'react-toastify/dist/ReactToastify.css' if only using 'react-hot-toast'
+// import 'react-toastify/dist/ReactToastify.css';
+import { supabase } from '@/lib/supabase';
+// No need for useEffect here if not used
+// import { useEffect } from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  // error state is no longer needed as react-hot-toast will handle messages
+  // const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Add loading state
 
   const handleLogin = async () => {
-  if (!email || !password) {
-    setError('Email and password are required.');
-    return;
-  }
+    setLoading(true); // Start loading
 
-  const { data: loginData, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    if (!email || !password) {
+      // setError('Email and password are required.'); // Replaced by toast
+      toast.error('Email and password are required.');
+      setLoading(false); // Stop loading
+      return;
+    }
 
-  if (error) {
-    setError(error.message);
-    toast.error('Login failed: ' + error.message);
-    return;
-  }
+    const { data: loginData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  // Fetch the user's role and org slug from your users table
-  const {
-    data: userData,
-    error: userError,
-  } = await supabase
-    .from('users') // your custom user table
-    .select('role, org_slug')
-    .eq('email', email)
-    .single();
+    if (authError) {
+      // setError(authError.message); // Replaced by toast
+      toast.error('Login failed: ' + authError.message);
+      setLoading(false); // Stop loading
+      return;
+    }
 
-  if (userError || !userData) {
-    toast.error('User role or organization not found.');
-    return;
-  }
+    // Check if user data is available from the login attempt
+    if (!loginData.user) {
+        toast.error('Authentication successful, but user data not found. Please try again.');
+        setLoading(false);
+        return;
+    }
 
-  const { role, org_slug } = userData;
+    // Fetch the user's role and org slug from your users table using the user's ID
+    // This is the CRUCIAL CHANGE: using loginData.user.id instead of email
+    const {
+      data: userData,
+      error: userProfileError,
+    } = await supabase
+      .from('users') // your custom user table
+      .select('role, organization_slug') // Ensure this matches your column name 'organization_slug' (not 'org_slug')
+      .eq('id', loginData.user.id) // <--- FIX IS HERE: Filter by the user's ID
+      .single();
 
-  toast.success('Logged in successfully!');
-  setTimeout(() => {
-    router.push(`/app/(protected)/${org_slug}/dashboard/${role}`);
-  }, 1000);
-};
+    if (userProfileError || !userData) {
+      console.error('Error fetching user profile:', userProfileError); // Log the actual error for debugging
+      let errorMessage = 'User role or organization not found.';
+      if (userProfileError?.code === '42501') {
+          errorMessage = 'Permission denied (RLS issue). Check your RLS policies for `public.users` SELECT.';
+      } else if (userProfileError?.details?.includes('zero rows')) {
+          errorMessage = 'User profile does not exist in the `public.users` table. Ensure signup trigger works.';
+      }
+      toast.error(errorMessage);
+      setLoading(false);
+      return;
+    }
+
+    // Ensure the column name here matches your database column: 'organization_slug'
+    const { role, organization_slug } = userData;
+
+    toast.success('Logged in successfully!');
+    setLoading(false); // Stop loading after success
+
+    setTimeout(() => {
+      // Use the correct variable name: organization_slug
+      router.push(`/app/(protected)/${organization_slug}/dashboard/${role}`);
+    }, 1000);
+  };
 
   return (
     <div className="relative min-h-screen w-full">
-      {/* Toastify */}
-      <ToastContainer position="top-right" autoClose={3000} />
+      {/* Toastify is replaced by react-hot-toast. The <Toaster /> component should be in your RootLayout. */}
+      {/* <ToastContainer position="top-right" autoClose={3000} /> */}
 
       {/* Background Image */}
       <Image
-        src="/book.png"
+        src="/book.png" // Make sure this path is correct
         alt="Background"
         fill
         priority
@@ -102,7 +131,8 @@ export default function LoginPage() {
             Log in
           </motion.h1>
 
-          {error && (
+          {/* Error display no longer uses local error state. Toast handles it. */}
+          {/* {error && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -110,7 +140,7 @@ export default function LoginPage() {
             >
               {error}
             </motion.p>
-          )}
+          )} */}
 
           <motion.div
             initial="hidden"
@@ -136,6 +166,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={loading} // Disable input while loading
             />
 
             {/* Password */}
@@ -152,11 +183,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 pr-10 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={loading} // Disable input while loading
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-800 hover:text-gray-500"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white" // Corrected text color for eye icon
+                disabled={loading} // Disable button while loading
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -182,9 +215,10 @@ export default function LoginPage() {
                 visible: { opacity: 1, y: 0 },
               }}
               onClick={handleLogin}
-              className="w-full py-3 rounded-md bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold hover:opacity-90 transition"
+              className="w-full py-3 rounded-md bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading} // Disable button while loading
             >
-              Log in
+              {loading ? 'Logging in...' : 'Log in'}
             </motion.button>
           </motion.div>
 
