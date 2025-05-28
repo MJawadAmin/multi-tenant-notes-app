@@ -4,10 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
-// We are using react-hot-toast, so ToastContainer from 'react-toastify' is not needed.
-// import { ToastContainer } from 'react-toastify';
 import { toast } from 'react-hot-toast'; // Import toast from react-hot-toast
-// import 'react-toastify/dist/ReactToastify.css'; // Not needed if only using react-hot-toast
 import { motion } from 'framer-motion';
 
 import { supabase } from '@/lib/supabase'; // Ensure this path is correct for your Supabase client
@@ -51,11 +48,14 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          // IMPORTANT: This `emailRedirectTo` URL must be added to your Supabase project's
-          // Authentication -> URL Configuration -> Redirect URLs.
-          // For example: `http://localhost:3000/signup-success`
-          // You should create a page at /signup-success to inform the user to check their email.
           emailRedirectTo: `${window.location.origin}/signup-success`,
+          // --- CRUCIAL CHANGE HERE: Pass custom data as user_metadata ---
+          data: {
+            username: username,
+            phone: phone,
+            role: role, // Pass the selected role
+            organization_slug: organizationSlug, // Pass the organization slug
+          },
         },
       });
 
@@ -85,7 +85,7 @@ export default function SignupPage() {
         // This path is usually taken if email confirmation is DISABLED in Supabase settings,
         // meaning the user is immediately signed up and logged in.
         toast.success('Signup successful! You are now logged in.', { duration: 5000 });
-        router.push('/login'); // Or wherever your main authenticated area is
+        router.push('/user-dashboard'); // Redirect to the new dashboard page
       }
 
     } catch (catchError: any) {
@@ -99,13 +99,6 @@ export default function SignupPage() {
 
   return (
     <div className="relative min-h-screen w-full">
-      {/* react-hot-toast uses <Toaster /> component for rendering toasts, not ToastContainer */}
-      {/* <ToastContainer position="top-right" autoClose={3000} /> */}
-      {/* You should place <Toaster /> in your root layout or highest common component */}
-      {/* For a quick test, you can put it here, but typically it's global */}
-      {/* <Toaster position="top-right" reverseOrder={false} /> */}
-
-
       {/* Background Image */}
       <Image
         src="/book.png" // Make sure this image exists in your /public folder
