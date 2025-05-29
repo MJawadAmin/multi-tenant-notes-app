@@ -20,7 +20,7 @@ interface Note {
   user_id: string | null;
   organization_slug: string;
   title: string;
-  description: string | null; // <--- ADDED: New description field
+  description: string | null;
   content: string | null;
 }
 
@@ -31,7 +31,7 @@ export default function Home() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newNoteTitle, setNewNoteTitle] = useState('');
-  const [newNoteDescription, setNewNoteDescription] = useState(''); // <--- ADDED: New state for description
+  const [newNoteDescription, setNewNoteDescription] = useState('');
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -67,7 +67,17 @@ export default function Home() {
     const channel = supabase
       .channel('public_notes_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (payload) => {
+        // --- START Debugging Logs (You can remove these after verifying) ---
         console.log('Realtime change received!', payload);
+        console.log('Event Type:', payload.eventType);
+        if (payload.new) {
+          console.log('New Record:', payload.new);
+        }
+        if (payload.old) {
+          console.log('Old Record:', payload.old);
+        }
+        // --- END Debugging Logs ---
+
         if (payload.eventType === 'INSERT') {
           setNotes((prevNotes) => [payload.new as Note, ...prevNotes]);
           toast.success('New note added!', { duration: 1500 });
@@ -78,6 +88,7 @@ export default function Home() {
             )
           );
           toast('Note updated!', { icon: '✏️', duration: 1500 });
+          // If the currently selected note is the one being updated, update the reader
           if (selectedNote && selectedNote.id === (payload.old as Note).id) {
             setSelectedNote(payload.new as Note);
           }
@@ -86,6 +97,7 @@ export default function Home() {
             prevNotes.filter((note) => note.id !== (payload.old as Note).id)
           );
           toast.error('Note deleted!', { duration: 1500 });
+          // If the currently selected note is the one being deleted, close the reader
           if (selectedNote && selectedNote.id === (payload.old as Note).id) {
             setSelectedNote(null);
           }
@@ -96,9 +108,9 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedNote]);
+  }, []); // <--- KEY FIX: Changed dependency array from [selectedNote] to []
 
-  const handleCreateNote = async (title: string, description: string | null, content: string | null) => { // <--- MODIFIED: Added description
+  const handleCreateNote = async (title: string, description: string | null, content: string | null) => {
     if (!title.trim()) {
       toast.error('Note title cannot be empty.');
       return;
@@ -109,7 +121,7 @@ export default function Home() {
       .insert({
         organization_slug: PUBLIC_ORG_SLUG,
         title: title.trim(),
-        description: description, // <--- ADDED: Saving description
+        description: description,
         content: content,
       })
       .select()
@@ -120,14 +132,14 @@ export default function Home() {
       toast.error('Failed to create note: ' + error.message);
     } else {
       setNewNoteTitle('');
-      setNewNoteDescription(''); // <--- ADDED: Clearing description state
+      setNewNoteDescription('');
       setNewNoteContent('');
       setShowCreateForm(false);
     }
     setIsCreating(false);
   };
 
-  const handleUpdateNote = async (noteId: string, title: string, description: string | null, content: string | null) => { // <--- MODIFIED: Added description
+  const handleUpdateNote = async (noteId: string, title: string, description: string | null, content: string | null) => {
     if (!title.trim()) {
       toast.error('Note title cannot be empty.');
       return;
@@ -137,7 +149,7 @@ export default function Home() {
       .from('notes')
       .update({
         title: title.trim(),
-        description: description, // <--- ADDED: Updating description
+        description: description,
         content: content,
       })
       .eq('id', noteId)
@@ -222,13 +234,13 @@ export default function Home() {
           {showCreateForm && (
             <NoteForm
               initialTitle={newNoteTitle}
-              initialDescription={newNoteDescription} // <--- ADDED: Passing initialDescription
+              initialDescription={newNoteDescription}
               initialContent={newNoteContent}
               onSubmit={handleCreateNote}
               onCancel={() => {
                 setShowCreateForm(false);
                 setNewNoteTitle('');
-                setNewNoteDescription(''); // <--- ADDED: Clearing description state
+                setNewNoteDescription('');
                 setNewNoteContent('');
               }}
               isSubmitting={isCreating}

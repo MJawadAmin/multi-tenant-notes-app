@@ -77,13 +77,16 @@ export default function LoginPage() {
     // Ensure the column name here matches your database column: 'organization_slug'
     const { role, organization_slug } = userData;
 
-    toast.success('Logged in successfully!');
-    setLoading(false); // Stop loading after success
+  toast.success('Logged in successfully!');
+setLoading(false); // Stop loading after success
 
-    setTimeout(() => {
-      // Use the correct variable name: organization_slug
-      router.push(`/app/(protected)/${organization_slug}/dashboard/${role}`);
-    }, 1000);
+setTimeout(() => {
+  // Fix: Remove '(protected)' or '(protect)' from the router.push path.
+  // The URL should directly reflect the actual path visible in the browser.
+ // In your login success handler:
+console.log('Pushing to path:', `/${organization_slug}/dashboard/${role}`);
+router.push(`/${organization_slug}/dashboard/${role}`);
+}, 1000);
   };
 
   return (

@@ -1,32 +1,26 @@
+// app/(protect)/[org-slug]/dashboard/admin/page.tsx
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-export default async function AdminDashboard({ params }: { params: { 'org-slug': string } }) {
+export default async function AdminDashboardPage({ params }: { params: { 'org-slug': string } }) {
+  // You might want to fetch admin-specific data here
   const supabase = createServerComponentClient({ cookies });
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (!user) {
+    // This case should be caught by middleware, but good for redundancy
+    redirect('/login');
+  }
 
-  if (!user) redirect('/login');
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  const role = session?.user.user_metadata?.role;
-  const org = session?.user.user_metadata?.orgSlug;
-
-  // 🚫 Check org-slug matches
-  if (org !== params['org-slug']) redirect('/unauthorized');
-
-  // 🚫 Check user has admin access
-  if (role !== 'admin') redirect(`/app/${params['org-slug']}/dashboards/user`);
+  const orgSlug = params['org-slug'];
 
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold">Admin Dashboard for {params['org-slug']}</h1>
-    </main>
+    <div className="min-h-screen p-8 bg-indigo-50 flex flex-col items-center justify-center">
+      <h1 className="text-4xl font-bold text-indigo-800 mb-4">Admin Dashboard</h1>
+      <p className="text-lg text-indigo-700 mb-2">Welcome, Administrator, for {orgSlug}!</p>
+      <p className="text-md text-indigo-600">You are logged in as: {user.email}</p>
+      {/* Add your admin-specific dashboard content here */}
+    </div>
   );
 }
