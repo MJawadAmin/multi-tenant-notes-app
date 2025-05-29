@@ -9,17 +9,19 @@ interface Note {
   user_id: string | null;
   organization_slug: string;
   title: string;
+  description: string | null; // <--- ADDED: New description field
   content: string | null;
 }
 
 interface NotesGridProps {
   notes: Note[];
-  onUpdate: (id: string, title: string, content: string | null) => Promise<void>;
+  onUpdate: (id: string, title: string, description: string | null, content: string | null) => Promise<void>; // <--- MODIFIED: Added description
   onDelete: (id: string) => Promise<void>;
   editingNoteId: string | null;
   setEditingNoteId: (id: string | null) => void;
   isUpdating: boolean;
   setIsUpdating: (state: boolean) => void;
+  onNoteClick: (note: Note) => void;
 }
 
 export default function NotesGrid({
@@ -30,6 +32,7 @@ export default function NotesGrid({
   setEditingNoteId,
   isUpdating,
   setIsUpdating,
+  onNoteClick,
 }: NotesGridProps) {
   const gridVariants = {
     visible: {
@@ -41,16 +44,18 @@ export default function NotesGrid({
 
   return (
     <motion.div
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" /* Increased gap for book effect */
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
       initial="hidden"
       animate="visible"
       variants={gridVariants}
     >
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {notes.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            key="no-notes"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             className="col-span-full text-center text-gray-500 py-12"
           >
             <p className="text-xl">No public notes found yet.</p>
@@ -58,16 +63,18 @@ export default function NotesGrid({
           </motion.div>
         ) : (
           notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              onUpdate={onUpdate}
-              onDelete={onDelete}
-              editingNoteId={editingNoteId}
-              setEditingNoteId={setEditingNoteId}
-              isUpdating={isUpdating}
-              setIsUpdating={setIsUpdating}
-            />
+            <motion.div key={note.id} layout>
+              <NoteCard
+                note={note}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                editingNoteId={editingNoteId}
+                setEditingNoteId={setEditingNoteId}
+                isUpdating={isUpdating}
+                setIsUpdating={setIsUpdating}
+                onClick={onNoteClick}
+              />
+            </motion.div>
           ))
         )}
       </AnimatePresence>

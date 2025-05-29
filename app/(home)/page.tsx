@@ -1,16 +1,16 @@
-'use client'; // KEEP THIS if you want state, effects, and client-side libraries
+// app/(home)/page.tsx
+'use client';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion'; // Still needed for other animations
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { PlusCircle } from 'lucide-react';
 
-// Reusable Components
-// import FeatureCard from '@/components/FeatureCard'; // REMOVED
 import NoteForm from '@/components/notes/NoteForm';
 import NotesGrid from '@/components/notes/NotesGrid';
+import NoteReader from '@/components/notes/NoteReader';
 import LoadingState from '@/components/ui/LoadingState';
 import ErrorState from '@/components/ui/ErrorState';
 
@@ -20,6 +20,7 @@ interface Note {
   user_id: string | null;
   organization_slug: string;
   title: string;
+  description: string | null; // <--- ADDED: New description field
   content: string | null;
 }
 
@@ -28,15 +29,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for creating new notes
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newNoteTitle, setNewNoteTitle] = useState('');
+  const [newNoteDescription, setNewNoteDescription] = useState(''); // <--- ADDED: New state for description
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  // State for editing notes
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
   const PUBLIC_ORG_SLUG = 'public-notes';
 
@@ -76,11 +78,17 @@ export default function Home() {
             )
           );
           toast('Note updated!', { icon: '✏️', duration: 1500 });
+          if (selectedNote && selectedNote.id === (payload.old as Note).id) {
+            setSelectedNote(payload.new as Note);
+          }
         } else if (payload.eventType === 'DELETE') {
           setNotes((prevNotes) =>
             prevNotes.filter((note) => note.id !== (payload.old as Note).id)
           );
           toast.error('Note deleted!', { duration: 1500 });
+          if (selectedNote && selectedNote.id === (payload.old as Note).id) {
+            setSelectedNote(null);
+          }
         }
       })
       .subscribe();
@@ -88,9 +96,9 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [selectedNote]);
 
-  const handleCreateNote = async (title: string, content: string | null) => {
+  const handleCreateNote = async (title: string, description: string | null, content: string | null) => { // <--- MODIFIED: Added description
     if (!title.trim()) {
       toast.error('Note title cannot be empty.');
       return;
@@ -101,6 +109,7 @@ export default function Home() {
       .insert({
         organization_slug: PUBLIC_ORG_SLUG,
         title: title.trim(),
+        description: description, // <--- ADDED: Saving description
         content: content,
       })
       .select()
@@ -111,13 +120,14 @@ export default function Home() {
       toast.error('Failed to create note: ' + error.message);
     } else {
       setNewNoteTitle('');
+      setNewNoteDescription(''); // <--- ADDED: Clearing description state
       setNewNoteContent('');
       setShowCreateForm(false);
     }
     setIsCreating(false);
   };
 
-  const handleUpdateNote = async (noteId: string, title: string, content: string | null) => {
+  const handleUpdateNote = async (noteId: string, title: string, description: string | null, content: string | null) => { // <--- MODIFIED: Added description
     if (!title.trim()) {
       toast.error('Note title cannot be empty.');
       return;
@@ -127,6 +137,7 @@ export default function Home() {
       .from('notes')
       .update({
         title: title.trim(),
+        description: description, // <--- ADDED: Updating description
         content: content,
       })
       .eq('id', noteId)
@@ -155,7 +166,9 @@ export default function Home() {
     }
   };
 
-  // Removed the features array since FeatureCards are no longer used
+  const handleNoteClick = (note: Note) => {
+    setSelectedNote(note);
+  };
 
   if (loading) {
     return <LoadingState message="Loading public notes..." />;
@@ -172,7 +185,6 @@ export default function Home() {
       transition={{ duration: 0.6 }}
       className="text-center space-y-12 min-h-screen flex flex-col items-center p-4 sm:p-8 bg-gradient-to-br from-blue-50 to-indigo-100 relative"
     >
-      {/* Background overlay for subtle texture, mimicking paper or wall */}
       <div className="absolute inset-0 z-0 bg-repeat opacity-10" style={{ backgroundImage: 'url("/paper-texture.png")', backgroundSize: '200px' }}></div>
       <div className="relative z-10 flex flex-col items-center space-y-4">
         <motion.div
@@ -190,11 +202,7 @@ export default function Home() {
         </p>
       </div>
 
-      {/* --- Features Section (REMOVED) --- */}
-      {/* The motion.div for features and the map over features are removed */}
-
-      {/* --- Notes Section --- */}
-      <div className="relative z-10 w-full max-w-6xl mt-12 mb-8 p-4 sm:p-6 bg-white shadow-xl rounded-lg border border-gray-200">
+      <div className="relative z-10 w-full max-w-8xl mt-12 mb-8 p-4 sm:p-6 bg-white shadow-xl rounded-lg border border-gray-200">
         <header className="flex flex-col sm:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-200">
           <h2 className="text-3xl font-extrabold text-gray-800 mb-4 sm:mb-0">
             Global Notes Board
@@ -210,16 +218,17 @@ export default function Home() {
           </motion.button>
         </header>
 
-        {/* New Note Form */}
         <AnimatePresence>
           {showCreateForm && (
             <NoteForm
               initialTitle={newNoteTitle}
+              initialDescription={newNoteDescription} // <--- ADDED: Passing initialDescription
               initialContent={newNoteContent}
               onSubmit={handleCreateNote}
               onCancel={() => {
                 setShowCreateForm(false);
                 setNewNoteTitle('');
+                setNewNoteDescription(''); // <--- ADDED: Clearing description state
                 setNewNoteContent('');
               }}
               isSubmitting={isCreating}
@@ -229,7 +238,6 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        {/* Notes Grid */}
         <NotesGrid
           notes={notes}
           onUpdate={handleUpdateNote}
@@ -238,10 +246,16 @@ export default function Home() {
           setEditingNoteId={setEditingNoteId}
           isUpdating={isUpdating}
           setIsUpdating={setIsUpdating}
+          onNoteClick={handleNoteClick}
         />
       </div>
 
-      {/* Optional: Add a login link */}
+      <AnimatePresence>
+        {selectedNote && (
+          <NoteReader note={selectedNote} onClose={() => setSelectedNote(null)} />
+        )}
+      </AnimatePresence>
+
       <div className="relative z-10 text-sm text-gray-600 mt-6 text-center">
         Looking for private notes and user management?{' '}
         <a href="/login" className="text-indigo-600 hover:underline">

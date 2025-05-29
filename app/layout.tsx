@@ -3,7 +3,8 @@ import './globals.css';
 import { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import CursorGlow from '@/components/CursorGlow';
-import { Toaster } from 'react-hot-toast'; // Import Toaster for react-hot-toast
+import ScrollResetter from '@/components/ScrollResetter'; // ✅ Import this
+import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -16,12 +17,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body
-        className={`${inter.className} relative overflow-hidden bg-gray-50 text-gray-800`}
-        suppressHydrationWarning={true} // <-- ADDED THIS LINE TO SUPPRESS HYDRATION WARNINGS
+        className={`${inter.className} bg-gray-50 text-gray-800 scroll-smooth overflow-x-hidden`}
+        suppressHydrationWarning={true}
       >
+        <ScrollResetter /> {/* ✅ Add this to fix scroll issues */}
         <CursorGlow />
         {children}
-        {/* Place the Toaster component here to make toasts available globally */}
         <Toaster position="top-right" reverseOrder={false} />
       </body>
     </html>

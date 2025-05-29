@@ -5,15 +5,17 @@ import { Save, X, RotateCw } from 'lucide-react'; // Icons
 
 interface NoteFormProps {
   initialTitle?: string;
+  initialDescription?: string | null; // <--- ADDED: New prop for description
   initialContent?: string | null;
-  onSubmit: (title: string, content: string | null) => void;
+  onSubmit: (title: string, description: string | null, content: string | null) => void; // <--- MODIFIED: Added description to onSubmit signature
   onCancel: () => void;
   isSubmitting: boolean;
   submitButtonText: string;
   cancelButtonText?: string;
   titlePlaceholder?: string;
+  descriptionPlaceholder?: string; // <--- ADDED: New placeholder prop
   contentPlaceholder?: string;
-  isCreateMode?: boolean; // Added to handle autofocus for new note
+  isCreateMode?: boolean;
 }
 
 const formVariants = {
@@ -23,6 +25,7 @@ const formVariants = {
 
 export default function NoteForm({
   initialTitle = '',
+  initialDescription = '', // <--- ADDED: Initialize description
   initialContent = '',
   onSubmit,
   onCancel,
@@ -30,17 +33,20 @@ export default function NoteForm({
   submitButtonText,
   cancelButtonText = 'Cancel',
   titlePlaceholder = 'Note Title',
-  contentPlaceholder = 'Note Content (optional)',
+  descriptionPlaceholder = 'Short Description / Synopsis (optional)', // <--- ADDED: Default placeholder
+  contentPlaceholder = 'Note Content (Full Book Text)', // Changed for clarity
   isCreateMode = false,
 }: NoteFormProps) {
   const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription); // <--- ADDED: New state for description
   const [content, setContent] = useState(initialContent);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTitle(initialTitle);
+    setDescription(initialDescription); // <--- ADDED: Update description on initial prop change
     setContent(initialContent);
-  }, [initialTitle, initialContent]);
+  }, [initialTitle, initialContent, initialDescription]); // <--- ADDED: initialDescription to dependency array
 
   useEffect(() => {
     if (isCreateMode && titleInputRef.current) {
@@ -50,7 +56,7 @@ export default function NoteForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(title, content);
+    onSubmit(title, description, content); // <--- MODIFIED: Pass description to onSubmit
   };
 
   return (
@@ -74,11 +80,21 @@ export default function NoteForm({
         className="w-full px-4 py-3 mb-4 rounded-md bg-white text-gray-800 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         disabled={isSubmitting}
       />
+      {/* New Description Input Field */}
+      <textarea
+        placeholder={descriptionPlaceholder}
+        value={description || ''}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3} // Shorter for description
+        className="w-full px-4 py-3 mb-4 rounded-md bg-white text-gray-800 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+        disabled={isSubmitting}
+      ></textarea>
+      {/* Original Content Input Field */}
       <textarea
         placeholder={contentPlaceholder}
-        value={content || ''} // Ensure it's a string for textarea
+        value={content || ''}
         onChange={(e) => setContent(e.target.value)}
-        rows={4}
+        rows={6} // Taller for full content
         className="w-full px-4 py-3 mb-4 rounded-md bg-white text-gray-800 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
         disabled={isSubmitting}
       ></textarea>
