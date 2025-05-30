@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'react-hot-toast';
+import { use } from 'react';
 
 interface User {
   id: string;
   email: string;
   role: string;
   created_at: string;
+  organization_slug: string;
 }
 
 interface InviteForm {
@@ -16,27 +18,83 @@ interface InviteForm {
   role: 'admin' | 'editor' | 'viewer';
 }
 
-export default function AdminDashboard({ params }: { params: { 'org-slug': string } }) {
+export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug': string }> }) {
+  const resolvedParams = use(params);
   const [users, setUsers] = useState<User[]>([]);
+  const [admins, setAdmins] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteForm, setInviteForm] = useState<InviteForm>({ email: '', role: 'viewer' });
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchUsers();
-  }, []);
+  }, [resolvedParams['org-slug']]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    } catch (error: any) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
+      console.log('Fetching users for organization:', resolvedParams['org-slug']);
+      
+      // First, let's check all users without organization filter
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('*');
+
+      if (allUsersError) {
+        console.error('Error fetching all users:', allUsersError);
+      } else {
+        console.log('All users in database:', allUsers);
+      }
+
+      // Now fetch users for the specific organization
       const { data, error } = await supabase
         .from('users')
         .select('*')
+        .eq('organization_slug', resolvedParams['org-slug'])
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUsers(data || []);
+      if (error) {
+        console.error('Error fetching organization users:', error);
+        throw error;
+      }
+
+      console.log('Fetched users for organization:', data);
+
+      // Log each user's role and organization
+      data?.forEach(user => {
+        console.log(`User: ${user.email}, Role: ${user.role}, Organization: ${user.organization_slug}`);
+      });
+
+      // Separate users and admins
+      const adminUsers = data?.filter(user => user.role === 'admin') || [];
+      const regularUsers = data?.filter(user => user.role !== 'admin') || [];
+
+      console.log('Admin users:', adminUsers);
+      console.log('Regular users:', regularUsers);
+
+      // Check if any users are missing organization_slug
+      const usersWithoutOrg = data?.filter(user => !user.organization_slug);
+      if (usersWithoutOrg?.length > 0) {
+        console.warn('Users without organization_slug:', usersWithoutOrg);
+      }
+
+      setAdmins(adminUsers);
+      setUsers(regularUsers);
     } catch (error: any) {
+      console.error('Error in fetchUsers:', error);
       toast.error('Error fetching users: ' + error.message);
     } finally {
       setLoading(false);
@@ -51,18 +109,25 @@ export default function AdminDashboard({ params }: { params: { 'org-slug': strin
     }
 
     try {
+      console.log('Inviting user:', inviteForm.email, 'with role:', inviteForm.role);
+      
       // 1. Create the user in auth.users
       const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(
         inviteForm.email,
         {
           data: {
             role: inviteForm.role,
-            organization_slug: params['org-slug']
+            organization_slug: resolvedParams['org-slug']
           }
         }
       );
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
+
+      console.log('Auth user created:', authData);
 
       // 2. Create the user record in our users table
       const { error: userError } = await supabase
@@ -72,22 +137,32 @@ export default function AdminDashboard({ params }: { params: { 'org-slug': strin
             id: authData.user.id,
             email: inviteForm.email,
             role: inviteForm.role,
-            organization_slug: params['org-slug']
+            organization_slug: resolvedParams['org-slug']
           }
         ]);
 
-      if (userError) throw userError;
+      if (userError) {
+        console.error('User creation error:', userError);
+        throw userError;
+      }
 
       toast.success('User invited successfully');
       setInviteForm({ email: '', role: 'viewer' });
       setShowInviteForm(false);
       fetchUsers();
     } catch (error: any) {
+      console.error('Error in handleInviteUser:', error);
       toast.error('Error inviting user: ' + error.message);
     }
   };
 
-  const handleDeleteUser = async (userId: string, userEmail: string) => {
+  const handleDeleteUser = async (userId: string, userEmail: string, userRole: string) => {
+    // Prevent deleting own account
+    if (userId === currentUserId) {
+      toast.error('You cannot delete your own account');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this user? They will be able to export their notes before deletion.')) {
       return;
     }
@@ -122,7 +197,7 @@ export default function AdminDashboard({ params }: { params: { 'org-slug': strin
       // 4. Reassign public notes to admin
       const { error: reassignError } = await supabase
         .from('notes')
-        .update({ user_id: (await supabase.auth.getUser()).data.user?.id })
+        .update({ user_id: currentUserId })
         .eq('user_id', userId)
         .eq('is_public', true);
 
@@ -151,6 +226,50 @@ export default function AdminDashboard({ params }: { params: { 'org-slug': strin
       toast.error('Error deleting user: ' + error.message);
     }
   };
+
+  const renderUserTable = (users: User[], title: string) => (
+    <div className="bg-white rounded-lg shadow p-6 mb-8">
+      <h2 className="text-xl font-semibold mb-4">{title}</h2>
+      {loading ? (
+        <div className="text-center py-4">Loading users...</div>
+      ) : users.length === 0 ? (
+        <div className="text-center py-4 text-gray-500">No {title.toLowerCase()} found</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <button
+                      onClick={() => handleDeleteUser(user.id, user.email, user.role)}
+                      className={`text-red-600 hover:text-red-900 ${user.id === currentUserId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={user.id === currentUserId}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen p-8 bg-gray-50">
@@ -204,45 +323,11 @@ export default function AdminDashboard({ params }: { params: { 'org-slug': strin
           </div>
         )}
         
-        {/* Users List */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Users Management</h2>
-          {loading ? (
-            <div className="text-center py-4">Loading users...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <button
-                          onClick={() => handleDeleteUser(user.id, user.email)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {/* Admins List */}
+        {renderUserTable(admins, 'Administrators')}
+
+        {/* Regular Users List */}
+        {renderUserTable(users, 'Users')}
       </div>
     </div>
   );
