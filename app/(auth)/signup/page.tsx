@@ -85,7 +85,7 @@ export default function SignupPage() {
         // This path is usually taken if email confirmation is DISABLED in Supabase settings,
         // meaning the user is immediately signed up and logged in.
         toast.success('Signup successful! You are now logged in.', { duration: 5000 });
-        router.push('/user-dashboard'); // Redirect to the new dashboard page
+        router.push('/login'); // Redirect to the new dashboard page
       }
 
     } catch (catchError: any) {

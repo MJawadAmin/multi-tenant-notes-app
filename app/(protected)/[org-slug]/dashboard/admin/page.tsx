@@ -1,14 +1,21 @@
+// app/admin/[org-slug]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'react-hot-toast';
 import { use } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation'; // Import useRouter for redirection
+
+// Import reusable components
+import UserTable from '@/components/admincomponents/UserTable';
+import InviteUserForm from '@/components/admincomponents/InviteUserForm';
 
 interface User {
   id: string;
   email: string;
-  role: string;
+  role: 'admin' | 'editor' | 'viewer';
   created_at: string;
   organization_slug: string;
 }
@@ -23,15 +30,22 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
   const [users, setUsers] = useState<User[]>([]);
   const [admins, setAdmins] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteForm, setInviteForm] = useState<InviteForm>({ email: '', role: 'viewer' });
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const supabase = createClientComponentClient();
+  const router = useRouter(); // Initialize useRouter
+
+  const organizationSlug = resolvedParams['org-slug'];
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchUsers();
-  }, [resolvedParams['org-slug']]);
+  }, []); // Fetch current user only once on component mount
+
+  useEffect(() => {
+    if (organizationSlug) {
+      fetchUsers();
+    }
+  }, [organizationSlug]); // Re-fetch users when org-slug changes
 
   const fetchCurrentUser = async () => {
     try {
@@ -41,29 +55,19 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
       }
     } catch (error: any) {
       console.error('Error fetching current user:', error);
+      toast.error('Error fetching current user: ' + error.message);
     }
   };
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      console.log('Fetching users for organization:', resolvedParams['org-slug']);
-      
-      // First, let's check all users without organization filter
-      const { data: allUsers, error: allUsersError } = await supabase
-        .from('users')
-        .select('*');
+      console.log('Fetching users for organization:', organizationSlug);
 
-      if (allUsersError) {
-        console.error('Error fetching all users:', allUsersError);
-      } else {
-        console.log('All users in database:', allUsers);
-      }
-
-      // Now fetch users for the specific organization
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('organization_slug', resolvedParams['org-slug'])
+        .eq('organization_slug', organizationSlug)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -73,23 +77,8 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
 
       console.log('Fetched users for organization:', data);
 
-      // Log each user's role and organization
-      data?.forEach(user => {
-        console.log(`User: ${user.email}, Role: ${user.role}, Organization: ${user.organization_slug}`);
-      });
-
-      // Separate users and admins
       const adminUsers = data?.filter(user => user.role === 'admin') || [];
       const regularUsers = data?.filter(user => user.role !== 'admin') || [];
-
-      console.log('Admin users:', adminUsers);
-      console.log('Regular users:', regularUsers);
-
-      // Check if any users are missing organization_slug
-      const usersWithoutOrg = data?.filter(user => !user.organization_slug);
-      if (usersWithoutOrg?.length > 0) {
-        console.warn('Users without organization_slug:', usersWithoutOrg);
-      }
 
       setAdmins(adminUsers);
       setUsers(regularUsers);
@@ -101,8 +90,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
     }
   };
 
-  const handleInviteUser = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleInviteUser = async (inviteForm: InviteForm) => {
     if (!inviteForm.email || !inviteForm.role) {
       toast.error('Please fill in all fields');
       return;
@@ -110,14 +98,14 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
 
     try {
       console.log('Inviting user:', inviteForm.email, 'with role:', inviteForm.role);
-      
+
       // 1. Create the user in auth.users
       const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(
         inviteForm.email,
         {
           data: {
             role: inviteForm.role,
-            organization_slug: resolvedParams['org-slug']
+            organization_slug: organizationSlug
           }
         }
       );
@@ -137,19 +125,19 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
             id: authData.user.id,
             email: inviteForm.email,
             role: inviteForm.role,
-            organization_slug: resolvedParams['org-slug']
+            organization_slug: organizationSlug
           }
         ]);
 
       if (userError) {
         console.error('User creation error:', userError);
+        // Consider rolling back auth user creation if user table insert fails
         throw userError;
       }
 
-      toast.success('User invited successfully');
-      setInviteForm({ email: '', role: 'viewer' });
+      toast.success('User invited successfully! An invitation email has been sent.');
       setShowInviteForm(false);
-      fetchUsers();
+      fetchUsers(); // Refresh the user list
     } catch (error: any) {
       console.error('Error in handleInviteUser:', error);
       toast.error('Error inviting user: ' + error.message);
@@ -159,11 +147,11 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
   const handleDeleteUser = async (userId: string, userEmail: string, userRole: string) => {
     // Prevent deleting own account
     if (userId === currentUserId) {
-      toast.error('You cannot delete your own account');
+      toast.error('You cannot delete your own account.');
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this user? They will be able to export their notes before deletion.')) {
+    if (!confirm(`Are you sure you want to delete user "${userEmail}"? This action cannot be undone. Public notes will be reassigned, and private notes will be deleted.`)) {
       return;
     }
 
@@ -178,12 +166,13 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
 
       // 2. Create export data
       const exportData = {
-        user: userEmail,
+        user_email: userEmail,
+        deleted_by_admin: currentUserId,
         timestamp: new Date().toISOString(),
         notes: notes
       };
 
-      // 3. Create and download export file
+      // 3. Create and download export file for the user's notes
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -193,142 +182,150 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+      toast('Downloading user notes backup...', { icon: '💾' });
 
-      // 4. Reassign public notes to admin
+
+      // 4. Reassign public notes to the current admin
       const { error: reassignError } = await supabase
         .from('notes')
         .update({ user_id: currentUserId })
         .eq('user_id', userId)
-        .eq('is_public', true);
+        .eq('is_public', true); // Only reassign public notes
 
-      if (reassignError) throw reassignError;
+      if (reassignError) {
+        console.error('Error reassigning public notes:', reassignError);
+        throw reassignError;
+      }
+      toast.success('Public notes reassigned to your account.');
 
-      // 5. Delete private notes
+      // 5. Delete private notes (is_public: false)
       const { error: deletePrivateError } = await supabase
         .from('notes')
         .delete()
         .eq('user_id', userId)
         .eq('is_public', false);
 
-      if (deletePrivateError) throw deletePrivateError;
+      if (deletePrivateError) {
+        console.error('Error deleting private notes:', deletePrivateError);
+        throw deletePrivateError;
+      }
+      toast.success('Private notes deleted.');
 
-      // 6. Delete the user
-      const { error: userError } = await supabase
+      // 6. Delete the user record from our 'users' table
+      const { error: userTableDeleteError } = await supabase
         .from('users')
         .delete()
         .eq('id', userId);
 
-      if (userError) throw userError;
+      if (userTableDeleteError) {
+        console.error('Error deleting user from users table:', userTableDeleteError);
+        throw userTableDeleteError;
+      }
+      toast.success('User removed from organization records.');
 
-      toast.success('User deleted successfully');
-      fetchUsers();
+      // 7. Delete the user from Supabase Auth (this is the final step)
+      // This requires service_role key for admin actions, which is usually done on the server.
+      // For client-side, you'd typically have a serverless function proxy this.
+      // If `supabase.auth.admin.deleteUser` requires `service_role` key, this won't work directly from client.
+      // A more robust solution involves a server-side API route.
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+      if (authDeleteError) {
+        console.error('Error deleting user from Auth:', authDeleteError);
+        throw authDeleteError;
+      }
+      toast.success('User account deleted from authentication system.');
+
+      fetchUsers(); // Refresh the user list
+      toast.success('User and their notes successfully managed/deleted!');
     } catch (error: any) {
+      console.error('Error in handleDeleteUser:', error);
       toast.error('Error deleting user: ' + error.message);
     }
   };
 
-  const renderUserTable = (users: User[], title: string) => (
-    <div className="bg-white rounded-lg shadow p-6 mb-8">
-      <h2 className="text-xl font-semibold mb-4">{title}</h2>
-      {loading ? (
-        <div className="text-center py-4">Loading users...</div>
-      ) : users.length === 0 ? (
-        <div className="text-center py-4 text-gray-500">No {title.toLowerCase()} found</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <button
-                      onClick={() => handleDeleteUser(user.id, user.email, user.role)}
-                      className={`text-red-600 hover:text-red-900 ${user.id === currentUserId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={user.id === currentUserId}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+        toast.error('Error logging out: ' + error.message);
+      } else {
+        toast.success('Successfully logged out!');
+        // Redirect to the login page
+        router.push('/login'); // Adjust '/login' to your actual login page path
+      }
+    } catch (error: any) {
+      console.error('Unexpected logout error:', error);
+      toast.error('An unexpected error occurred during logout.');
+    }
+  };
+
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
+    <div className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-indigo-100 font-sans">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <button
-            onClick={() => setShowInviteForm(!showInviteForm)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-          >
-            {showInviteForm ? 'Cancel' : 'Invite User'}
-          </button>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex justify-between items-center mb-10 bg-white p-6 rounded-lg shadow-md border-b-4 border-indigo-500"
+        >
+          <h1 className="text-4xl font-extrabold text-gray-900">
+            <span className="text-indigo-600">Admin</span> Dashboard
+            <span className="block text-sm font-normal text-gray-500 mt-1">Organization: {organizationSlug}</span>
+          </h1>
+          <div className="flex items-center space-x-4"> {/* Container for buttons */}
+            <motion.button
+              onClick={() => setShowInviteForm(!showInviteForm)}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold shadow-lg hover:bg-indigo-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center space-x-2"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              <span>{showInviteForm ? 'Close Form' : 'Invite New User'}</span>
+            </motion.button>
+
+            <motion.button
+              onClick={handleLogout}
+              className="px-6 py-3 bg-red-600 text-white rounded-full font-semibold shadow-lg hover:bg-red-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center space-x-2"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 3a1 1 0 011-1h6a1 1 0 110 2H4v10h12V8a1 1 0 112 0v10a2 2 0 01-2 2H4a2 2 0 01-2-2V3zm9.3-1.3a1 1 0 011.4 0l3 3a1 1 0 010 1.4l-3 3a1 1 0 01-1.4-1.4L13.59 9H8a1 1 0 110-2h5.59l-1.3-1.3a1 1 0 010-1.4z" clipRule="evenodd" />
+              </svg>
+              <span>Logout</span>
+            </motion.button>
+          </div>
+        </motion.div>
 
         {/* Invite User Form */}
-        {showInviteForm && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-4">Invite New User</h2>
-            <form onSubmit={handleInviteUser} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-                <input
-                  type="email"
-                  id="email"
-                  value={inviteForm.email}
-                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
-                <select
-                  id="role"
-                  value={inviteForm.role}
-                  onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="editor">Editor</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Send Invitation
-              </button>
-            </form>
-          </div>
-        )}
-        
+        <AnimatePresence>
+          {showInviteForm && (
+            <InviteUserForm onInvite={handleInviteUser} onCancel={() => setShowInviteForm(false)} />
+          )}
+        </AnimatePresence>
+
         {/* Admins List */}
-        {renderUserTable(admins, 'Administrators')}
+        <UserTable
+          users={admins}
+          title="Administrators"
+          loading={loading}
+          currentUserId={currentUserId}
+          onDeleteUser={handleDeleteUser}
+        />
 
         {/* Regular Users List */}
-        {renderUserTable(users, 'Users')}
+        <UserTable
+          users={users}
+          title="Members"
+          loading={loading}
+          currentUserId={currentUserId}
+          onDeleteUser={handleDeleteUser}
+        />
       </div>
     </div>
   );
-} 
+}
