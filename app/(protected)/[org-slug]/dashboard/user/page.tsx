@@ -1,8 +1,15 @@
+// app/user/[org-slug]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation'; // Import useRouter
+
+// Import reusable components
+import NoteForm from '@/components/usercomponents/NoteForm'; // Adjust path as needed
+import NoteCard from '@/components/usercomponents/NoteCard'; // Adjust path as needed
 
 interface Note {
   id: string;
@@ -16,17 +23,25 @@ interface Note {
 export default function UserDashboard({ params }: { params: { 'org-slug': string } }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newNote, setNewNote] = useState({ title: '', content: '', is_public: false });
   const supabase = createClientComponentClient();
+  const router = useRouter(); // Initialize useRouter
+
+  // The organization slug from params can be used if needed for user-specific features related to their org
+  // const organizationSlug = params['org-slug'];
 
   useEffect(() => {
     fetchNotes();
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
   const fetchNotes = async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!user) {
+        // If no user, redirect to login (or handle as unauthorized)
+        router.push('/login'); // Adjust to your login page path
+        throw new Error('User not authenticated');
+      }
 
       const { data, error } = await supabase
         .from('notes')
@@ -37,46 +52,46 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
       if (error) throw error;
       setNotes(data || []);
     } catch (error: any) {
+      console.error('Error fetching notes:', error);
       toast.error('Error fetching notes: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNote.title.trim()) {
+  const handleCreateNote = async (noteData: { title: string; content: string; is_public: boolean }) => {
+    if (!noteData.title.trim()) {
       toast.error('Title is required');
       return;
     }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!user) throw new Error('User not authenticated');
 
       const { error } = await supabase
         .from('notes')
         .insert([
           {
-            title: newNote.title,
-            content: newNote.content,
-            is_public: newNote.is_public,
-            user_id: user.id
-          }
+            title: noteData.title,
+            content: noteData.content,
+            is_public: noteData.is_public,
+            user_id: user.id,
+          },
         ]);
 
       if (error) throw error;
 
-      toast.success('Note created successfully');
-      setNewNote({ title: '', content: '', is_public: false });
-      fetchNotes();
+      toast.success('Note created successfully!');
+      fetchNotes(); // Re-fetch notes to update the list
     } catch (error: any) {
+      console.error('Error creating note:', error);
       toast.error('Error creating note: ' + error.message);
     }
   };
 
   const handleDeleteNote = async (noteId: string) => {
-    if (!confirm('Are you sure you want to delete this note?')) {
+    if (!confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
       return;
     }
 
@@ -84,13 +99,14 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
       const { error } = await supabase
         .from('notes')
         .delete()
-        .eq('id', noteId);
+        .eq('id', noteId); // Ensure RLS policies prevent deleting other users' notes
 
       if (error) throw error;
 
-      toast.success('Note deleted successfully');
-      fetchNotes();
+      toast.success('Note deleted successfully!');
+      setNotes(notes.filter((note) => note.id !== noteId)); // Optimistic UI update
     } catch (error: any) {
+      console.error('Error deleting note:', error);
       toast.error('Error deleting note: ' + error.message);
     }
   };
@@ -98,9 +114,9 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
   const handleExportNotes = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!user) throw new Error('User not authenticated');
 
-      const { data: notes, error } = await supabase
+      const { data: userNotes, error } = await supabase
         .from('notes')
         .select('*')
         .eq('user_id', user.id);
@@ -108,121 +124,126 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
       if (error) throw error;
 
       const exportData = {
-        user: user.email,
+        user_email: user.email,
         timestamp: new Date().toISOString(),
-        notes: notes
+        notes: userNotes,
       };
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `notes-export-${new Date().toISOString()}.json`;
+      a.download = `notes-export-${user.email}-${new Date().toISOString()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
-      toast.success('Notes exported successfully');
+      toast.success('Notes exported successfully!');
     } catch (error: any) {
+      console.error('Error exporting notes:', error);
       toast.error('Error exporting notes: ' + error.message);
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+        toast.error('Error logging out: ' + error.message);
+      } else {
+        toast.success('Successfully logged out!');
+        router.push('/login'); // Redirect to your login page
+      }
+    } catch (error: any) {
+      console.error('Unexpected logout error:', error);
+      toast.error('An unexpected error occurred during logout.');
+    }
+  };
+
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
+    <div className="min-h-screen p-8 bg-gradient-to-br from-purple-50 to-pink-50 font-sans">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Notes</h1>
-          <button
-            onClick={handleExportNotes}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            Export Notes
-          </button>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-6 rounded-lg shadow-md border-b-4 border-purple-500"
+        >
+          <h1 className="text-4xl font-extrabold text-gray-900 mb-4 md:mb-0">
+            <span className="text-purple-600">My</span> Notes
+          </h1>
+          <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
+            <motion.button
+              onClick={handleExportNotes}
+              className="px-6 py-3 bg-green-600 text-white rounded-full font-semibold shadow-lg hover:bg-green-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              <span>Export All Notes</span>
+            </motion.button>
+            <motion.button
+              onClick={handleLogout}
+              className="px-6 py-3 bg-red-600 text-white rounded-full font-semibold shadow-lg hover:bg-red-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 3a1 1 0 011-1h6a1 1 0 110 2H4v10h12V8a1 1 0 112 0v10a2 2 0 01-2 2H4a2 2 0 01-2-2V3zm9.3-1.3a1 1 0 011.4 0l3 3a1 1 0 010 1.4l-3 3a1 1 0 01-1.4-1.4L13.59 9H8a1 1 0 110-2h5.59l-1.3-1.3a1 1 0 010-1.4z" clipRule="evenodd" />
+              </svg>
+              <span>Logout</span>
+            </motion.button>
+          </div>
+        </motion.div>
 
         {/* Create Note Form */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Add New Note</h2>
-          <form onSubmit={handleCreateNote} className="space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
-              <input
-                type="text"
-                id="title"
-                value={newNote.title}
-                onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
-              <textarea
-                id="content"
-                value={newNote.content}
-                onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                rows={4}
-              />
-            </div>
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="is_public"
-                checked={newNote.is_public}
-                onChange={(e) => setNewNote({ ...newNote, is_public: e.target.checked })}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label htmlFor="is_public" className="ml-2 block text-sm text-gray-900">
-                Make this note public
-              </label>
-            </div>
-            <button
-              type="submit"
-              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Create Note
-            </button>
-          </form>
-        </div>
+        <NoteForm onSubmit={handleCreateNote} className="mb-8" submitButtonText="Create Note" />
 
         {/* Notes List */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">My Notes</h2>
+        <div className="bg-white rounded-lg shadow-xl p-6">
+          <h2 className="text-2xl font-bold mb-5 text-gray-800 border-b pb-3">My Notes</h2>
           {loading ? (
-            <div className="text-center py-4">Loading notes...</div>
-          ) : notes.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">No notes found. Create your first note!</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {notes.map((note) => (
-                <div key={note.id} className="border rounded-lg p-4 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-semibold">{note.title}</h3>
-                    <span className={`text-xs px-2 py-1 rounded ${note.is_public ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {note.is_public ? 'Public' : 'Private'}
-                    </span>
-                  </div>
-                  <p className="text-gray-600 mb-4 whitespace-pre-wrap">{note.content}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      {new Date(note.updated_at).toLocaleDateString()}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteNote(note.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading your notes...</p>
             </div>
+          ) : notes.length === 0 ? (
+            <motion.div
+              className="text-center py-8 text-gray-500 bg-gray-50 rounded-md"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <p className="text-lg">No notes found. Start by creating your first note above!</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.1,
+                  },
+                },
+              }}
+            >
+              <AnimatePresence>
+                {notes.map((note) => (
+                  <NoteCard key={note.id} note={note} onDelete={handleDeleteNote} />
+                ))}
+              </AnimatePresence>
+            </motion.div>
           )}
         </div>
       </div>
     </div>
   );
-} 
+}
