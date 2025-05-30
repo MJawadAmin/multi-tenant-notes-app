@@ -4,89 +4,61 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { toast } from 'react-hot-toast'; // Changed from 'react-toastify' to 'react-hot-toast'
+import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
-// No need for 'react-toastify/dist/ReactToastify.css' if only using 'react-hot-toast'
-// import 'react-toastify/dist/ReactToastify.css';
 import { supabase } from '@/lib/supabase';
-// No need for useEffect here if not used
-// import { useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // error state is no longer needed as react-hot-toast will handle messages
-  // const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // Add loading state
+  const [loading, setLoading] = useState(false);
+  const supabase = createClientComponentClient();
 
-  const handleLogin = async () => {
-    setLoading(true); // Start loading
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-    if (!email || !password) {
-      // setError('Email and password are required.'); // Replaced by toast
-      toast.error('Email and password are required.');
-      setLoading(false); // Stop loading
-      return;
-    }
+    try {
+      // 1. Sign in with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    const { data: loginData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+      if (authError) throw authError;
 
-    if (authError) {
-      // setError(authError.message); // Replaced by toast
-      toast.error('Login failed: ' + authError.message);
-      setLoading(false); // Stop loading
-      return;
-    }
-
-    // Check if user data is available from the login attempt
-    if (!loginData.user) {
-        toast.error('Authentication successful, but user data not found. Please try again.');
-        setLoading(false);
-        return;
-    }
-
-    // Fetch the user's role and org slug from your users table using the user's ID
-    // This is the CRUCIAL CHANGE: using loginData.user.id instead of email
-    const {
-      data: userData,
-      error: userProfileError,
-    } = await supabase
-      .from('users') // your custom user table
-      .select('role, organization_slug') // Ensure this matches your column name 'organization_slug' (not 'org_slug')
-      .eq('id', loginData.user.id) // <--- FIX IS HERE: Filter by the user's ID
-      .single();
-
-    if (userProfileError || !userData) {
-      console.error('Error fetching user profile:', userProfileError); // Log the actual error for debugging
-      let errorMessage = 'User role or organization not found.';
-      if (userProfileError?.code === '42501') {
-          errorMessage = 'Permission denied (RLS issue). Check your RLS policies for `public.users` SELECT.';
-      } else if (userProfileError?.details?.includes('zero rows')) {
-          errorMessage = 'User profile does not exist in the `public.users` table. Ensure signup trigger works.';
+      if (!authData.user) {
+        throw new Error('No user data returned');
       }
-      toast.error(errorMessage);
+
+      // 2. Fetch user's role and organization from the users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role, organization_slug')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (userError) throw userError;
+
+      if (!userData) {
+        throw new Error('User profile not found');
+      }
+
+      // 3. Redirect based on role
+      const { role, organization_slug } = userData;
+      const redirectPath = `/${organization_slug}/dashboard/${role}`;
+      
+      toast.success('Login successful!');
+      router.push(redirectPath);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Failed to login');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Ensure the column name here matches your database column: 'organization_slug'
-    const { role, organization_slug } = userData;
-
-  toast.success('Logged in successfully!');
-setLoading(false); // Stop loading after success
-
-setTimeout(() => {
-  // Fix: Remove '(protected)' or '(protect)' from the router.push path.
-  // The URL should directly reflect the actual path visible in the browser.
- // In your login success handler:
-console.log('Pushing to path:', `/${organization_slug}/dashboard/${role}`);
-router.push(`/${organization_slug}/dashboard/${role}`);
-}, 1000);
   };
 
   return (
@@ -134,17 +106,6 @@ router.push(`/${organization_slug}/dashboard/${role}`);
             Log in
           </motion.h1>
 
-          {/* Error display no longer uses local error state. Toast handles it. */}
-          {/* {error && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-red-400 text-sm mb-4 text-center"
-            >
-              {error}
-            </motion.p>
-          )} */}
-
           <motion.div
             initial="hidden"
             animate="visible"
@@ -169,7 +130,7 @@ router.push(`/${organization_slug}/dashboard/${role}`);
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={loading} // Disable input while loading
+              disabled={loading}
             />
 
             {/* Password */}
@@ -186,13 +147,13 @@ router.push(`/${organization_slug}/dashboard/${role}`);
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 pr-10 rounded-md bg-transparent text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                disabled={loading} // Disable input while loading
+                disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white" // Corrected text color for eye icon
-                disabled={loading} // Disable button while loading
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                disabled={loading}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -219,7 +180,7 @@ router.push(`/${organization_slug}/dashboard/${role}`);
               }}
               onClick={handleLogin}
               className="w-full py-3 rounded-md bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading} // Disable button while loading
+              disabled={loading}
             >
               {loading ? 'Logging in...' : 'Log in'}
             </motion.button>
@@ -232,7 +193,7 @@ router.push(`/${organization_slug}/dashboard/${role}`);
             transition={{ delay: 0.6 }}
             className="text-sm text-gray-300 mt-6 text-center"
           >
-            Don’t have an account?{' '}
+            Don't have an account?{' '}
             <a href="/signup" className="text-indigo-400 underline">
               Sign up
             </a>
