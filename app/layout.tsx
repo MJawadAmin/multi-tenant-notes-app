@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
   title: 'Multi-Tenant Notes App',
-  description: 'Collaborative, secure notes for your entire organization..',
+  description: 'Collaborative, secure notes for your entire organization.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
