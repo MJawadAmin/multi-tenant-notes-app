@@ -39,20 +39,27 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [currentUserUid, setCurrentUserUid] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null); // New state for user's name/email
 
   const supabase = createClientComponentClient();
   const router = useRouter();
 
-  useEffect(() => {
-    fetchNotes();
-    const fetchUserUid = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserUid(user.id);
+ useEffect(() => {
+  fetchNotes();
+  const fetchUserUidAndName = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setCurrentUserUid(user.id);
+      // Set user name from user_metadata.full_name or fallback to email (without @gmail.com)
+      let userName = user.user_metadata?.full_name || user.email;
+      if (userName.includes('@gmail.com')) {
+        userName = userName.split('@')[0]; // Remove everything after the @
       }
-    };
-    fetchUserUid();
-  }, []);
+      setCurrentUserName(userName);
+    }
+  };
+  fetchUserUidAndName();
+}, []);
 
   const fetchNotes = async () => {
     setLoading(true);
@@ -235,7 +242,14 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
           className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-6 rounded-lg shadow-md border-b-4 border-purple-500"
         >
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 md:mb-0">
-            <span className="text-purple-600">My</span> Notes
+            {currentUserName ? (
+              <>
+                <span className="text-purple-600">Welcome to </span> {currentUserName}!
+              </>
+            ) : (
+              <span className="text-purple-600">My</span>
+            )}{' '}
+            Notes
           </h1>
           <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
             <motion.button
