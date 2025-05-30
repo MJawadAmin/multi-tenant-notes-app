@@ -6,9 +6,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
-import { PlusCircle } from 'lucide-react';
 
-import NoteForm from '@/components/notes/NoteForm';
 import NotesGrid from '@/components/notes/NotesGrid';
 import NoteReader from '@/components/notes/NoteReader';
 import LoadingState from '@/components/ui/LoadingState';
@@ -28,16 +26,6 @@ export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newNoteTitle, setNewNoteTitle] = useState('');
-  const [newNoteDescription, setNewNoteDescription] = useState('');
-  const [newNoteContent, setNewNoteContent] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
   const PUBLIC_ORG_SLUG = 'public-notes';
@@ -67,17 +55,6 @@ export default function Home() {
     const channel = supabase
       .channel('public_notes_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (payload) => {
-        // --- START Debugging Logs (You can remove these after verifying) ---
-        console.log('Realtime change received!', payload);
-        console.log('Event Type:', payload.eventType);
-        if (payload.new) {
-          console.log('New Record:', payload.new);
-        }
-        if (payload.old) {
-          console.log('Old Record:', payload.old);
-        }
-        // --- END Debugging Logs ---
-
         if (payload.eventType === 'INSERT') {
           setNotes((prevNotes) => [payload.new as Note, ...prevNotes]);
           toast.success('New note added!', { duration: 1500 });
@@ -88,7 +65,6 @@ export default function Home() {
             )
           );
           toast('Note updated!', { icon: '✏️', duration: 1500 });
-          // If the currently selected note is the one being updated, update the reader
           if (selectedNote && selectedNote.id === (payload.old as Note).id) {
             setSelectedNote(payload.new as Note);
           }
@@ -97,7 +73,6 @@ export default function Home() {
             prevNotes.filter((note) => note.id !== (payload.old as Note).id)
           );
           toast.error('Note deleted!', { duration: 1500 });
-          // If the currently selected note is the one being deleted, close the reader
           if (selectedNote && selectedNote.id === (payload.old as Note).id) {
             setSelectedNote(null);
           }
@@ -108,75 +83,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // <--- KEY FIX: Changed dependency array from [selectedNote] to []
-
-  const handleCreateNote = async (title: string, description: string | null, content: string | null) => {
-    if (!title.trim()) {
-      toast.error('Note title cannot be empty.');
-      return;
-    }
-    setIsCreating(true);
-    const { error } = await supabase
-      .from('notes')
-      .insert({
-        organization_slug: PUBLIC_ORG_SLUG,
-        title: title.trim(),
-        description: description,
-        content: content,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating note:', error);
-      toast.error('Failed to create note: ' + error.message);
-    } else {
-      setNewNoteTitle('');
-      setNewNoteDescription('');
-      setNewNoteContent('');
-      setShowCreateForm(false);
-    }
-    setIsCreating(false);
-  };
-
-  const handleUpdateNote = async (noteId: string, title: string, description: string | null, content: string | null) => {
-    if (!title.trim()) {
-      toast.error('Note title cannot be empty.');
-      return;
-    }
-    setIsUpdating(true);
-    const { error } = await supabase
-      .from('notes')
-      .update({
-        title: title.trim(),
-        description: description,
-        content: content,
-      })
-      .eq('id', noteId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating note:', error);
-      toast.error('Failed to update note: ' + error.message);
-    } else {
-      setEditingNoteId(null);
-    }
-    setIsUpdating(false);
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    if (!window.confirm('Are you sure you want to delete this note?')) return;
-    const { error } = await supabase
-      .from('notes')
-      .delete()
-      .eq('id', noteId);
-
-    if (error) {
-      console.error('Error deleting note:', error);
-      toast.error('Failed to delete note: ' + error.message);
-    }
-  };
+  }, []);
 
   const handleNoteClick = (note: Note) => {
     setSelectedNote(note);
@@ -210,7 +117,7 @@ export default function Home() {
           Public Notes Whiteboard
         </h1>
         <p className="text-lg text-indigo-700 max-w-xl">
-          Your instant, collaborative workspace for notes and ideas.
+          View and read public notes. Sign in to create and manage your own notes.
         </p>
       </div>
 
@@ -219,46 +126,18 @@ export default function Home() {
           <h2 className="text-3xl font-extrabold text-gray-800 mb-4 sm:mb-0">
             Global Notes Board
           </h2>
-          <motion.button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-300"
-          >
-            <PlusCircle size={20} className="mr-2" />
-            {showCreateForm ? 'Cancel' : 'New Public Note'}
-          </motion.button>
         </header>
-
-        <AnimatePresence>
-          {showCreateForm && (
-            <NoteForm
-              initialTitle={newNoteTitle}
-              initialDescription={newNoteDescription}
-              initialContent={newNoteContent}
-              onSubmit={handleCreateNote}
-              onCancel={() => {
-                setShowCreateForm(false);
-                setNewNoteTitle('');
-                setNewNoteDescription('');
-                setNewNoteContent('');
-              }}
-              isSubmitting={isCreating}
-              submitButtonText="Save Note"
-              isCreateMode={true}
-            />
-          )}
-        </AnimatePresence>
 
         <NotesGrid
           notes={notes}
-          onUpdate={handleUpdateNote}
-          onDelete={handleDeleteNote}
-          editingNoteId={editingNoteId}
-          setEditingNoteId={setEditingNoteId}
-          isUpdating={isUpdating}
-          setIsUpdating={setIsUpdating}
+          onUpdate={async () => Promise.resolve()}
+          onDelete={async () => Promise.resolve()}
+          editingNoteId={null}
+          setEditingNoteId={() => {}}
+          isUpdating={false}
+          setIsUpdating={() => {}}
           onNoteClick={handleNoteClick}
+          currentUserUid={null}
         />
       </div>
 
@@ -269,7 +148,7 @@ export default function Home() {
       </AnimatePresence>
 
       <div className="relative z-10 text-sm text-gray-600 mt-6 text-center">
-        Looking for private notes and user management?{' '}
+        Want to create and manage your own notes?{' '}
         <a href="/login" className="text-indigo-600 hover:underline">
           Log in or Sign up
         </a>

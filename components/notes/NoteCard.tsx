@@ -24,6 +24,7 @@ interface NoteCardProps {
   onClick: (note: Note) => void;
   // --- ADDED: New prop to control edit/delete visibility ---
   canEditOrDelete: boolean;
+  currentUserUid: string | null;
 }
 
 const cardVariants = {
@@ -42,6 +43,7 @@ export default function NoteCard({
   setIsUpdating,
   onClick,
   canEditOrDelete, // Destructure the new prop
+  currentUserUid,
 }: NoteCardProps) {
   const isEditing = editingNoteId === note.id;
   const [editedTitle, setEditedTitle] = useState(note.title);
@@ -178,31 +180,28 @@ export default function NoteCard({
           </p>
           <div className="flex justify-between items-center mt-auto text-sm text-gray-500 z-10">
             <span>Created: {new Date(note.created_at).toLocaleDateString()}</span>
-            <div className="flex space-x-2">
-              {/* --- CONDITIONAL RENDERING FOR EDIT AND DELETE BUTTONS --- */}
-              {canEditOrDelete && (
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={handleEditClick}
-                    className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
-                    aria-label="Edit note"
-                  >
-                    <Edit size={18} />
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-                    className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
-                    aria-label="Delete note"
-                  >
-                    <Trash2 size={18} />
-                  </motion.button>
-                </>
-              )}
-            </div>
+            {canEditOrDelete && (
+              <div className="flex space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleEditClick}
+                  className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
+                  aria-label="Edit note"
+                >
+                  <Edit size={18} />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+                  className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
+                  aria-label="Delete note"
+                >
+                  <Trash2 size={18} />
+                </motion.button>
+              </div>
+            )}
           </div>
         </>
       )}

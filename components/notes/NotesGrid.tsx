@@ -1,4 +1,4 @@
-// components/usercomponents/NotesGrid.tsx
+// components/notes/NotesGrid.tsx
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoteCard from './NoteCard';
@@ -22,20 +22,12 @@ interface NotesGridProps {
   isUpdating: boolean;
   setIsUpdating: (state: boolean) => void;
   onNoteClick: (note: Note) => void;
-  // --- ADDED: New prop for the current user's UID ---
   currentUserUid: string | null;
 }
 
 export default function NotesGrid({
   notes,
-  onUpdate,
-  onDelete,
-  editingNoteId,
-  setEditingNoteId,
-  isUpdating,
-  setIsUpdating,
   onNoteClick,
-  currentUserUid, // Destructure the new prop here
 }: NotesGridProps) {
   const gridVariants = {
     visible: {
@@ -61,23 +53,23 @@ export default function NotesGrid({
             exit={{ opacity: 0, y: -20 }}
             className="col-span-full text-center text-gray-500 py-12"
           >
-            <p className="text-xl">No notes found yet.</p> {/* Updated message */}
-            <p className="text-lg">Be the first to create one!</p>
+            <p className="text-xl">No notes found yet.</p>
+            <p className="text-lg">Sign in to create your first note!</p>
           </motion.div>
         ) : (
           notes.map((note) => (
             <motion.div key={note.id} layout>
               <NoteCard
                 note={note}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                editingNoteId={editingNoteId}
-                setEditingNoteId={setEditingNoteId}
-                isUpdating={isUpdating}
-                setIsUpdating={setIsUpdating}
+                onUpdate={async () => Promise.resolve()}
+                onDelete={async () => Promise.resolve()}
+                editingNoteId={null}
+                setEditingNoteId={() => {}}
+                isUpdating={false}
+                setIsUpdating={() => {}}
                 onClick={onNoteClick}
-                // --- CRITICAL FIX: Pass canEditOrDelete based on currentUserUid ---
-                canEditOrDelete={note.user_id === currentUserUid}
+                canEditOrDelete={false}
+                currentUserUid={null}
               />
             </motion.div>
           ))

@@ -18,6 +18,7 @@ interface User {
   role: 'admin' | 'editor' | 'viewer';
   created_at: string;
   organization_slug: string;
+  status: 'pending' | 'active' | 'deleted';
 }
 
 interface InviteForm {
