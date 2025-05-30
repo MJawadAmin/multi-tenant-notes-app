@@ -1,4 +1,4 @@
-// components/notes/NoteCard.tsx
+// components/usercomponents/NoteCard.tsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Edit, Trash2, Save, X, RotateCw } from 'lucide-react';
@@ -9,19 +9,21 @@ interface Note {
   user_id: string | null;
   organization_slug: string;
   title: string;
-  description: string | null; // <--- ADDED: New description field
+  description: string | null;
   content: string | null;
 }
 
 interface NoteCardProps {
   note: Note;
-  onUpdate: (id: string, title: string, description: string | null, content: string | null) => Promise<void>; // <--- MODIFIED: Added description
+  onUpdate: (id: string, title: string, description: string | null, content: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   editingNoteId: string | null;
   setEditingNoteId: (id: string | null) => void;
   isUpdating: boolean;
   setIsUpdating: (state: boolean) => void;
   onClick: (note: Note) => void;
+  // --- ADDED: New prop to control edit/delete visibility ---
+  canEditOrDelete: boolean;
 }
 
 const cardVariants = {
@@ -39,16 +41,17 @@ export default function NoteCard({
   isUpdating,
   setIsUpdating,
   onClick,
+  canEditOrDelete, // Destructure the new prop
 }: NoteCardProps) {
   const isEditing = editingNoteId === note.id;
   const [editedTitle, setEditedTitle] = useState(note.title);
-  const [editedDescription, setEditedDescription] = useState(note.description); // <--- ADDED: New state for description
+  const [editedDescription, setEditedDescription] = useState(note.description);
   const [editedContent, setEditedContent] = useState(note.content);
 
   useEffect(() => {
     if (!isEditing) {
       setEditedTitle(note.title);
-      setEditedDescription(note.description); // <--- ADDED: Reset description
+      setEditedDescription(note.description);
       setEditedContent(note.content);
     }
   }, [note, isEditing]);
@@ -57,27 +60,19 @@ export default function NoteCard({
     e.stopPropagation();
     setEditingNoteId(note.id);
     setEditedTitle(note.title);
-    setEditedDescription(note.description); // <--- ADDED: Set description for editing
+    setEditedDescription(note.description);
     setEditedContent(note.content);
   };
 
-  const handleSaveEdit = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!editedTitle.trim()) {
-      alert('Note title cannot be empty.');
-      return;
-    }
-    setIsUpdating(true);
-    await onUpdate(note.id, editedTitle, editedDescription, editedContent); // <--- MODIFIED: Pass description
-    setIsUpdating(false);
-    setEditingNoteId(null);
+  const handleUpdateClick = async () => {
+    await onUpdate(note.id, editedTitle, editedDescription, editedContent);
   };
 
   const handleCancelEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingNoteId(null);
-    setEditedTitle(note.title);
-    setEditedDescription(note.description); // <--- ADDED: Revert description on cancel
+    setEditedTitle(note.title); // Reset to original values
+    setEditedDescription(note.description);
     setEditedContent(note.content);
   };
 
@@ -154,7 +149,7 @@ export default function NoteCard({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleSaveEdit}
+              onClick={handleUpdateClick} // Attach handler
               className="p-2 rounded-full bg-green-600 hover:bg-green-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isUpdating || !editedTitle.trim()}
               aria-label="Save note"
@@ -164,7 +159,7 @@ export default function NoteCard({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleCancelEdit}
+              onClick={handleCancelEdit} // Attach handler
               className="p-2 rounded-full bg-gray-600 hover:bg-gray-700 text-white transition"
               aria-label="Cancel editing"
             >
@@ -184,24 +179,29 @@ export default function NoteCard({
           <div className="flex justify-between items-center mt-auto text-sm text-gray-500 z-10">
             <span>Created: {new Date(note.created_at).toLocaleDateString()}</span>
             <div className="flex space-x-2">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleEditClick}
-                className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
-                aria-label="Edit note"
-              >
-                <Edit size={18} />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-                className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
-                aria-label="Delete note"
-              >
-                <Trash2 size={18} />
-              </motion.button>
+              {/* --- CONDITIONAL RENDERING FOR EDIT AND DELETE BUTTONS --- */}
+              {canEditOrDelete && (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleEditClick}
+                    className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
+                    aria-label="Edit note"
+                  >
+                    <Edit size={18} />
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+                    className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
+                    aria-label="Delete note"
+                  >
+                    <Trash2 size={18} />
+                  </motion.button>
+                </>
+              )}
             </div>
           </div>
         </>

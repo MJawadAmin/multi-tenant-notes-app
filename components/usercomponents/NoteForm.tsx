@@ -1,87 +1,117 @@
-// components/usercomponents/NoteForm.tsx
-import React, { useState } from 'react';
+// components/notes/NoteForm.tsx
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { Save, X, RotateCw } from 'lucide-react';
 
 interface NoteFormProps {
-  initialNote?: { title: string; content: string; is_public: boolean };
-  onSubmit: (note: { title: string; content: string; is_public: boolean }) => void;
-  submitButtonText?: string;
-  className?: string;
+  initialTitle?: string;
+  initialDescription?: string | null;
+  initialContent?: string | null;
+  onSubmit: (title: string, description: string | null, content: string | null) => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+  submitButtonText: string;
+  cancelButtonText?: string;
+  titlePlaceholder?: string;
+  descriptionPlaceholder?: string;
+  contentPlaceholder?: string;
+  isCreateMode?: boolean;
 }
 
-const NoteForm: React.FC<NoteFormProps> = ({
-  initialNote = { title: '', content: '', is_public: false },
+const formVariants = {
+  hidden: { opacity: 0, height: 0, transition: { duration: 0.3 } },
+  visible: { opacity: 1, height: 'auto', transition: { duration: 0.5, ease: 'easeOut' } },
+};
+
+export default function NoteForm({
+  initialTitle = '',
+  initialDescription = '',
+  initialContent = '',
   onSubmit,
-  submitButtonText = 'Create Note',
-  className,
-}) => {
-  const [note, setNote] = useState(initialNote);
+  onCancel,
+  isSubmitting,
+  submitButtonText,
+  cancelButtonText = 'Cancel',
+  titlePlaceholder = 'Note Title',
+  descriptionPlaceholder = 'A brief description (optional)',
+  contentPlaceholder = 'Start writing your note here...',
+  isCreateMode = false,
+}: NoteFormProps) {
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription);
+  const [content, setContent] = useState(initialContent);
+
+  useEffect(() => {
+    setTitle(initialTitle);
+    setDescription(initialDescription);
+    setContent(initialContent);
+  }, [initialTitle, initialDescription, initialContent]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(note);
-    setNote({ title: '', content: '', is_public: false }); // Reset form after submission
+    onSubmit(title, description, content);
   };
 
   return (
-    <motion.div
-      className={`bg-white rounded-lg shadow-xl p-6 ${className || ''}`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+    <motion.form
+      onSubmit={handleSubmit}
+      className="bg-white p-6 rounded-lg shadow-xl border-t-4 border-indigo-500"
+      variants={formVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
     >
-      <h2 className="text-2xl font-bold mb-5 text-gray-800 border-b pb-3">Add New Note</h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-            Title
-          </label>
-          <input
-            type="text"
-            id="title"
-            value={note.title}
-            onChange={(e) => setNote({ ...note, title: e.target.value })}
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
-            placeholder="Your note title"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
-            Content
-          </label>
-          <textarea
-            id="content"
-            value={note.content}
-            onChange={(e) => setNote({ ...note, content: e.target.value })}
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
-            rows={5}
-            placeholder="Write your note content here..."
-          />
-        </div>
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="is_public"
-            checked={note.is_public}
-            onChange={(e) => setNote({ ...note, is_public: e.target.checked })}
-            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-          />
-          <label htmlFor="is_public" className="ml-2 block text-sm text-gray-900">
-            Make this note public
-          </label>
-        </div>
+      <h2 className="text-3xl font-extrabold text-gray-800 mb-6">
+        {isCreateMode ? 'Create New Note' : 'Edit Note'}
+      </h2>
+      <input
+        type="text"
+        placeholder={titlePlaceholder}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="w-full px-4 py-3 mb-4 rounded-md bg-white text-gray-800 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        disabled={isSubmitting}
+        required
+      />
+      <textarea
+        placeholder={descriptionPlaceholder}
+        value={description || ''}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        className="w-full px-4 py-3 mb-4 rounded-md bg-white text-gray-800 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+        disabled={isSubmitting}
+      ></textarea>
+      <textarea
+        placeholder={contentPlaceholder}
+        value={content || ''}
+        onChange={(e) => setContent(e.target.value)}
+        rows={6}
+        className="w-full px-4 py-3 mb-4 rounded-md bg-white text-gray-800 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+        disabled={isSubmitting}
+      ></textarea>
+      <div className="flex justify-end space-x-3">
         <motion.button
-          type="submit"
-          className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          type="submit"
+          className="py-3 px-6 rounded-md bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isSubmitting}
         >
-          {submitButtonText}
+          {isSubmitting ? <RotateCw className="animate-spin mr-2" size={20} /> : <Save size={20} className="mr-2" />}
+          {isSubmitting ? 'Saving...' : submitButtonText}
         </motion.button>
-      </form>
-    </motion.div>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          type="button"
+          onClick={onCancel}
+          className="py-3 px-6 rounded-md bg-gray-500 hover:bg-gray-600 text-white font-semibold flex items-center justify-center space-x-2 transition"
+          disabled={isSubmitting}
+        >
+          <X size={20} className="mr-2" />
+          {cancelButtonText}
+        </motion.button>
+      </div>
+    </motion.form>
   );
-};
-
-export default NoteForm;
+}

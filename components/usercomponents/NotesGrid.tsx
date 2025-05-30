@@ -7,10 +7,12 @@ interface Note {
   id: string;
   created_at: string;
   user_id: string | null;
-  organization_slug: string;
+  organization_slug: string | null; // Changed to allow null
   title: string;
   description: string | null;
   content: string | null;
+  is_public: boolean; // Added
+  updated_at: string | null; // Added
 }
 
 interface NotesGridProps {
@@ -22,7 +24,6 @@ interface NotesGridProps {
   isUpdating: boolean;
   setIsUpdating: (state: boolean) => void;
   onNoteClick: (note: Note) => void;
-  // --- ADDED: New prop for the current user's UID ---
   currentUserUid: string | null;
 }
 
@@ -35,7 +36,7 @@ export default function NotesGrid({
   isUpdating,
   setIsUpdating,
   onNoteClick,
-  currentUserUid, // Destructure the new prop here
+  currentUserUid,
 }: NotesGridProps) {
   const gridVariants = {
     visible: {
@@ -61,7 +62,7 @@ export default function NotesGrid({
             exit={{ opacity: 0, y: -20 }}
             className="col-span-full text-center text-gray-500 py-12"
           >
-            <p className="text-xl">No notes found yet.</p> {/* Updated message */}
+            <p className="text-xl">No notes found yet.</p>
             <p className="text-lg">Be the first to create one!</p>
           </motion.div>
         ) : (
@@ -76,7 +77,6 @@ export default function NotesGrid({
                 isUpdating={isUpdating}
                 setIsUpdating={setIsUpdating}
                 onClick={onNoteClick}
-                // --- CRITICAL FIX: Pass canEditOrDelete based on currentUserUid ---
                 canEditOrDelete={note.user_id === currentUserUid}
               />
             </motion.div>

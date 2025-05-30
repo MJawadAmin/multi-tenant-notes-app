@@ -1,45 +1,65 @@
-// app/user/[org-slug]/page.tsx
+// app/(protected)/[org-slug]/dashboard/user/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
+import { use } from "react"; // Re-added the import for 'use'
+
 
 // Import reusable components
-import NoteForm from '@/components/usercomponents/NoteForm'; // Adjust path as needed
-import NoteCard from '@/components/usercomponents/NoteCard'; // Adjust path as needed
+import NoteForm from '@/components/usercomponents/NoteForm';
+import NotesGrid from '@/components/usercomponents/NotesGrid';
+import NoteReader from '@/components/usercomponents/NotesReader'; // Corrected import path based on common practice, assuming NoteReader.tsx exists
 
 interface Note {
   id: string;
   title: string;
-  content: string;
-  is_public: boolean;
+  description: string | null;
+  content: string | null;
+  is_public: boolean; // Ensured this exists
   created_at: string;
-  updated_at: string;
+  updated_at: string | null; // Ensured this exists and allows null
+  user_id: string | null;
+  organization_slug: string | null; // Ensured this exists and allows null
 }
 
-export default function UserDashboard({ params }: { params: { 'org-slug': string } }) {
+// Reverted params type back to Promise as per console error
+export default function Page({ params }: { params: Promise<{ "org-slug": string }> }) {
+  // Use React.use() to unwrap the params Promise as recommended by the console error
+  const resolvedParams = use(params);
+  const { "org-slug": orgSlug } = resolvedParams; // Destructure orgSlug from the resolved params
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
-  const router = useRouter(); // Initialize useRouter
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [currentUserUid, setCurrentUserUid] = useState<string | null>(null);
 
-  // The organization slug from params can be used if needed for user-specific features related to their org
-  // const organizationSlug = params['org-slug'];
+  const supabase = createClientComponentClient();
+  const router = useRouter();
 
   useEffect(() => {
     fetchNotes();
-  }, []); // Empty dependency array means this runs once on mount
+    const fetchUserUid = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserUid(user.id);
+      }
+    };
+    fetchUserUid();
+  }, []);
 
   const fetchNotes = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        // If no user, redirect to login (or handle as unauthorized)
-        router.push('/login'); // Adjust to your login page path
+        router.push('/login');
         throw new Error('User not authenticated');
       }
 
@@ -59,11 +79,12 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
     }
   };
 
-  const handleCreateNote = async (noteData: { title: string; content: string; is_public: boolean }) => {
-    if (!noteData.title.trim()) {
+  const handleCreateNote = async (title: string, description: string | null, content: string | null) => {
+    if (!title.trim()) {
       toast.error('Title is required');
       return;
     }
+    setIsUpdating(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -73,20 +94,51 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
         .from('notes')
         .insert([
           {
-            title: noteData.title,
-            content: noteData.content,
-            is_public: noteData.is_public,
+            title,
+            description,
+            content,
+            is_public: false,
             user_id: user.id,
+            organization_slug: orgSlug, // Used orgSlug which is unwrapped from params
           },
         ]);
 
       if (error) throw error;
 
       toast.success('Note created successfully!');
-      fetchNotes(); // Re-fetch notes to update the list
+      setIsCreating(false);
+      fetchNotes();
     } catch (error: any) {
       console.error('Error creating note:', error);
       toast.error('Error creating note: ' + error.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdateNote = async (id: string, title: string, description: string | null, content: string | null) => {
+    if (!title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+    setIsUpdating(true);
+
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .update({ title, description, content, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Note updated successfully!');
+      setEditingNoteId(null);
+      fetchNotes();
+    } catch (error: any) {
+      console.error('Error updating note:', error);
+      toast.error('Error updating note: ' + error.message);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -99,12 +151,15 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
       const { error } = await supabase
         .from('notes')
         .delete()
-        .eq('id', noteId); // Ensure RLS policies prevent deleting other users' notes
+        .eq('id', noteId);
 
       if (error) throw error;
 
       toast.success('Note deleted successfully!');
-      setNotes(notes.filter((note) => note.id !== noteId)); // Optimistic UI update
+      setNotes(notes.filter((note) => note.id !== noteId));
+      if (selectedNote && selectedNote.id === noteId) {
+        setSelectedNote(null);
+      }
     } catch (error: any) {
       console.error('Error deleting note:', error);
       toast.error('Error deleting note: ' + error.message);
@@ -154,12 +209,20 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
         toast.error('Error logging out: ' + error.message);
       } else {
         toast.success('Successfully logged out!');
-        router.push('/login'); // Redirect to your login page
+        router.push('/login');
       }
     } catch (error: any) {
       console.error('Unexpected logout error:', error);
       toast.error('An unexpected error occurred during logout.');
     }
+  };
+
+  const handleNoteClick = (note: Note) => {
+    setSelectedNote(note);
+  };
+
+  const handleCloseReader = () => {
+    setSelectedNote(null);
   };
 
   return (
@@ -200,8 +263,70 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
           </div>
         </motion.div>
 
-        {/* Create Note Form */}
-        <NoteForm onSubmit={handleCreateNote} className="mb-8" submitButtonText="Create Note" />
+        {/* Create Note Form Button */}
+        {!isCreating && (
+          <motion.button
+            onClick={() => setIsCreating(true)}
+            className="mb-8 px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold shadow-lg hover:bg-indigo-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            <span>Create New Note</span>
+          </motion.button>
+        )}
+
+
+        {/* Create/Edit Note Form */}
+        <AnimatePresence>
+          {isCreating && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mb-8"
+            >
+              <NoteForm
+                onSubmit={handleCreateNote}
+                onCancel={() => setIsCreating(false)}
+                isSubmitting={isUpdating}
+                submitButtonText="Save Note"
+                titlePlaceholder="Note Title"
+                descriptionPlaceholder="A brief description of your note (optional)"
+                contentPlaceholder="Start writing your note here..."
+                isCreateMode={true}
+              />
+            </motion.div>
+          )}
+
+          {editingNoteId && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mb-8"
+            >
+              <NoteForm
+                initialTitle={notes.find(note => note.id === editingNoteId)?.title || ''}
+                initialDescription={notes.find(note => note.id === editingNoteId)?.description || ''}
+                initialContent={notes.find(note => note.id === editingNoteId)?.content || ''}
+                onSubmit={(title, description, content) => handleUpdateNote(editingNoteId, title, description, content)}
+                onCancel={() => setEditingNoteId(null)}
+                isSubmitting={isUpdating}
+                submitButtonText="Update Note"
+                titlePlaceholder="Note Title"
+                descriptionPlaceholder="A brief description of your note (optional)"
+                contentPlaceholder="Start writing your note here..."
+                isCreateMode={false}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
 
         {/* Notes List */}
         <div className="bg-white rounded-lg shadow-xl p-6">
@@ -221,29 +346,27 @@ export default function UserDashboard({ params }: { params: { 'org-slug': string
               <p className="text-lg">No notes found. Start by creating your first note above!</p>
             </motion.div>
           ) : (
-            <motion.div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: {
-                  opacity: 1,
-                  transition: {
-                    staggerChildren: 0.1,
-                  },
-                },
-              }}
-            >
-              <AnimatePresence>
-                {notes.map((note) => (
-                  <NoteCard key={note.id} note={note} onDelete={handleDeleteNote} />
-                ))}
-              </AnimatePresence>
-            </motion.div>
+            <NotesGrid
+              notes={notes}
+              onUpdate={handleUpdateNote}
+              onDelete={handleDeleteNote}
+              editingNoteId={editingNoteId}
+              setEditingNoteId={setEditingNoteId}
+              isUpdating={isUpdating}
+              setIsUpdating={setIsUpdating}
+              onNoteClick={handleNoteClick}
+              currentUserUid={currentUserUid}
+            />
           )}
         </div>
       </div>
+
+      {/* Note Reader Modal */}
+      <AnimatePresence>
+        {selectedNote && (
+          <NoteReader note={selectedNote} onClose={handleCloseReader} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

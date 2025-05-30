@@ -1,64 +1,181 @@
 // components/usercomponents/NoteCard.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Edit, Trash2, Save, X, RotateCw } from 'lucide-react';
 
 interface Note {
   id: string;
-  title: string;
-  content: string;
-  is_public: boolean;
   created_at: string;
-  updated_at: string;
+  user_id: string | null;
+  organization_slug: string | null; // Changed to allow null
+  title: string;
+  description: string | null;
+  content: string | null;
+  is_public: boolean; // Added
+  updated_at: string | null; // Added
 }
 
 interface NoteCardProps {
   note: Note;
-  onDelete: (noteId: string) => void;
+  onUpdate: (id: string, title: string, description: string | null, content: string | null) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  editingNoteId: string | null;
+  setEditingNoteId: (id: string | null) => void;
+  isUpdating: boolean;
+  setIsUpdating: (state: boolean) => void;
+  onClick: (note: Note) => void;
+  canEditOrDelete: boolean;
 }
 
-const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete }) => {
-  return (
-    <motion.div
-      className="border rounded-lg p-5 bg-white shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col justify-between"
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: 0.1 }}
-      whileHover={{ scale: 1.02 }}
-    >
-      <div>
-        <div className="flex justify-between items-start mb-3">
-          <h3 className="text-xl font-semibold text-gray-800">{note.title}</h3>
-          <span
-            className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-              note.is_public ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}
-          >
-            {note.is_public ? 'Public' : 'Private'}
-          </span>
-        </div>
-        <p className="text-gray-600 mb-4 text-sm whitespace-pre-wrap line-clamp-4">
-          {note.content || 'No content provided.'}
-        </p>
-      </div>
-      <div className="flex justify-between items-center border-t pt-3">
-        <span className="text-xs text-gray-500">
-          Last updated: {new Date(note.updated_at).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          })}
-        </span>
-        <motion.button
-          onClick={() => onDelete(note.id)}
-          className="text-red-600 hover:text-red-800 px-3 py-1 rounded-md transition-colors duration-200 hover:bg-red-50"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Delete
-        </motion.button>
-      </div>
-    </motion.div>
-  );
+const cardVariants = {
+  hidden: { opacity: 0, y: 50, scale: 0.8, rotateY: -5, rotateX: 2 },
+  visible: { opacity: 1, y: 0, scale: 1, rotateY: 0, rotateX: 0, transition: { type: "spring", stiffness: 180, damping: 20 } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.2 } },
 };
 
-export default NoteCard;
+export default function NoteCard({
+  note,
+  onUpdate,
+  onDelete,
+  editingNoteId,
+  setEditingNoteId,
+  isUpdating,
+  setIsUpdating,
+  onClick,
+  canEditOrDelete,
+}: NoteCardProps) {
+  const isEditing = editingNoteId === note.id;
+  const [currentTitle, setCurrentTitle] = useState(note.title);
+  const [currentDescription, setCurrentDescription] = useState(note.description);
+  const [currentContent, setCurrentContent] = useState(note.content);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setCurrentTitle(note.title);
+      setCurrentDescription(note.description);
+      setCurrentContent(note.content);
+    }
+  }, [isEditing, note.title, note.description, note.content]);
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingNoteId(note.id);
+  };
+
+  const handleSaveClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsUpdating(true);
+    await onUpdate(note.id, currentTitle, currentDescription, currentContent);
+    setIsUpdating(false);
+  };
+
+  const handleCancelClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingNoteId(null);
+    setCurrentTitle(note.title); // Reset to original values
+    setCurrentDescription(note.description);
+    setCurrentContent(note.content);
+  };
+
+  return (
+    <motion.div
+      className="bg-white rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden cursor-pointer relative group"
+      variants={cardVariants}
+      whileHover={{ scale: 1.03, transition: { duration: 0.2 } }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onClick(note)}
+    >
+      {isEditing ? (
+        <div className="p-6 flex flex-col flex-grow">
+          <input
+            type="text"
+            value={currentTitle}
+            onChange={(e) => setCurrentTitle(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="text-2xl font-bold text-gray-800 mb-2 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Note Title"
+            disabled={isUpdating}
+          />
+          <textarea
+            value={currentDescription || ''}
+            onChange={(e) => setCurrentDescription(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="text-gray-700 mb-4 flex-grow p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+            rows={2}
+            placeholder="Description (optional)"
+            disabled={isUpdating}
+          />
+          <textarea
+            value={currentContent || ''}
+            onChange={(e) => setCurrentContent(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="text-gray-700 mb-4 flex-grow p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+            rows={4}
+            placeholder="Content (optional)"
+            disabled={isUpdating}
+          />
+          <div className="flex justify-end space-x-2 mt-auto">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleSaveClick}
+              className="p-2 rounded-full bg-green-500 hover:bg-green-600 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Save note"
+              disabled={isUpdating}
+            >
+              {isUpdating ? <RotateCw className="animate-spin" size={18} /> : <Save size={18} />}
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleCancelClick}
+              className="p-2 rounded-full bg-gray-400 hover:bg-gray-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Cancel edit"
+              disabled={isUpdating}
+            >
+              <X size={18} />
+            </motion.button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="p-6 flex flex-col flex-grow">
+            <h3 className="text-2xl font-bold text-gray-800 mb-2 truncate">
+              {note.title}
+            </h3>
+            <p className="text-gray-700 mb-4 flex-grow overflow-hidden whitespace-pre-wrap line-clamp-3">
+              {note.description || 'No description provided.'}
+            </p>
+            <div className="flex justify-between items-center mt-auto text-sm text-gray-500 z-10">
+              <span>Created: {new Date(note.created_at).toLocaleDateString()}</span>
+              <div className="flex space-x-2">
+                {canEditOrDelete && (
+                  <>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleEditClick}
+                      className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
+                      aria-label="Edit note"
+                    >
+                      <Edit size={18} />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+                      className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
+                      aria-label="Delete note"
+                    >
+                      <Trash2 size={18} />
+                    </motion.button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </motion.div>
+  );
+}
