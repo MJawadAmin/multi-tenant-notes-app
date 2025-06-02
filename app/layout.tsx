@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import CursorGlow from '@/components/CursorGlow';
 import ScrollResetter from '@/components/ScrollResetter'; // ✅ Import this
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ScrollResetter /> {/* ✅ Add this to fix scroll issues */}
         <CursorGlow />
         {children}
-        <Toaster position="top-right" reverseOrder={false} />
+        <Toaster />
       </body>
     </html>
   );

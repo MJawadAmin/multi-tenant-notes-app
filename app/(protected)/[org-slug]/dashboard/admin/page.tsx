@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { use } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation'; // Import useRouter for redirection
+import { generateMultipleNotesPDF } from '@/utils/pdfGenerator';
 
 // Import reusable components
 import UserTable from '@/components/admincomponents/UserTable';
@@ -165,28 +166,17 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
 
       if (notesError) throw notesError;
 
-      // 2. Create export data
-      const exportData = {
-        user_email: userEmail,
-        deleted_by_admin: currentUserId,
-        timestamp: new Date().toISOString(),
-        notes: notes
-      };
+      // 2. Generate PDF backup of user's notes
+      if (notes && notes.length > 0) {
+        await generateMultipleNotesPDF(notes, {
+          title: `Notes Backup - ${userEmail}`,
+          includeMetadata: true,
+          fileName: `notes-backup-${userEmail}-${new Date().toISOString().split('T')[0]}.pdf`
+        });
+        toast('Downloading user notes backup...', { icon: '💾' });
+      }
 
-      // 3. Create and download export file for the user's notes
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `notes-export-${userEmail}-${new Date().toISOString()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast('Downloading user notes backup...', { icon: '💾' });
-
-
-      // 4. Reassign public notes to the current admin
+      // 3. Reassign public notes to the current admin
       const { error: reassignError } = await supabase
         .from('notes')
         .update({ user_id: currentUserId })
@@ -199,7 +189,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
       }
       toast.success('Public notes reassigned to your account.');
 
-      // 5. Delete private notes (is_public: false)
+      // 4. Delete private notes (is_public: false)
       const { error: deletePrivateError } = await supabase
         .from('notes')
         .delete()
@@ -212,7 +202,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
       }
       toast.success('Private notes deleted.');
 
-      // 6. Delete the user record from our 'users' table
+      // 5. Delete the user record from our 'users' table
       const { error: userTableDeleteError } = await supabase
         .from('users')
         .delete()
@@ -224,7 +214,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ 'org-slug
       }
       toast.success('User removed from organization records.');
 
-      // 7. Delete the user from Supabase Auth (this is the final step)
+      // 6. Delete the user from Supabase Auth (this is the final step)
       // This requires service_role key for admin actions, which is usually done on the server.
       // For client-side, you'd typically have a serverless function proxy this.
       // If `supabase.auth.admin.deleteUser` requires `service_role` key, this won't work directly from client.
