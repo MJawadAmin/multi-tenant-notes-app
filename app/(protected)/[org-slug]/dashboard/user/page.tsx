@@ -4,15 +4,12 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { use } from "react"; // Re-added the import for 'use'
-
 
 // Import reusable components
 import NoteForm from '@/components/usercomponents/NoteForm';
 import NotesGrid from '@/components/usercomponents/NotesGrid';
-import NoteReader from '@/components/usercomponents/NotesReader'; // Corrected import path based on common practice, assuming NoteReader.tsx exists
+import NoteReader from '@/components/usercomponents/NotesReader';
 
 interface Note {
   id: string;
@@ -26,11 +23,14 @@ interface Note {
   organization_slug: string | null; // Ensured this exists and allows null
 }
 
-// Reverted params type back to Promise as per console error
 export default function Page({ params }: { params: Promise<{ "org-slug": string }> }) {
-  // Use React.use() to unwrap the params Promise as recommended by the console error
-  const resolvedParams = use(params);
-  const { "org-slug": orgSlug } = resolvedParams; // Destructure orgSlug from the resolved params
+  const [orgSlug, setOrgSlug] = useState<string>('');
+
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setOrgSlug(resolvedParams["org-slug"]);
+    });
+  }, [params]);
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,12 +235,7 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-br from-purple-50 to-pink-50 font-sans">
       <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-6 rounded-lg shadow-md border-b-4 border-purple-500"
-        >
+        <div className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-6 rounded-lg shadow-md border-b-4 border-purple-500">
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 md:mb-0">
             {currentUserName ? (
               <>
@@ -252,95 +247,73 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
             Notes
           </h1>
           <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
-            <motion.button
+            <button
               onClick={handleExportNotes}
               className="px-6 py-3 bg-green-600 text-white rounded-full font-semibold shadow-lg hover:bg-green-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
               <span>Export All Notes</span>
-            </motion.button>
-            <motion.button
+            </button>
+            <button
               onClick={handleLogout}
               className="px-6 py-3 bg-red-600 text-white rounded-full font-semibold shadow-lg hover:bg-red-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 011-1h6a1 1 0 110 2H4v10h12V8a1 1 0 112 0v10a2 2 0 01-2 2H4a2 2 0 01-2-2V3zm9.3-1.3a1 1 0 011.4 0l3 3a1 1 0 010 1.4l-3 3a1 1 0 01-1.4-1.4L13.59 9H8a1 1 0 110-2h5.59l-1.3-1.3a1 1 0 010-1.4z" clipRule="evenodd" />
               </svg>
               <span>Logout</span>
-            </motion.button>
+            </button>
           </div>
-        </motion.div>
+        </div>
 
         {/* Create Note Form Button */}
         {!isCreating && (
-          <motion.button
+          <button
             onClick={() => setIsCreating(true)}
             className="mb-8 px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold shadow-lg hover:bg-indigo-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
             </svg>
             <span>Create New Note</span>
-          </motion.button>
+          </button>
         )}
 
-
         {/* Create/Edit Note Form */}
-        <AnimatePresence>
-          {isCreating && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-              className="mb-8"
-            >
-              <NoteForm
-                onSubmit={handleCreateNote}
-                onCancel={() => setIsCreating(false)}
-                isSubmitting={isUpdating}
-                submitButtonText="Save Note"
-                titlePlaceholder="Note Title"
-                descriptionPlaceholder="A brief description of your note (optional)"
-                contentPlaceholder="Start writing your note here..."
-                isCreateMode={true}
-              />
-            </motion.div>
-          )}
+        {isCreating && (
+          <div className="mb-8">
+            <NoteForm
+              onSubmit={handleCreateNote}
+              onCancel={() => setIsCreating(false)}
+              isSubmitting={isUpdating}
+              submitButtonText="Save Note"
+              titlePlaceholder="Note Title"
+              descriptionPlaceholder="A brief description of your note (optional)"
+              contentPlaceholder="Start writing your note here..."
+              isCreateMode={true}
+            />
+          </div>
+        )}
 
-          {editingNoteId && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-              className="mb-8"
-            >
-              <NoteForm
-                initialTitle={notes.find(note => note.id === editingNoteId)?.title || ''}
-                initialDescription={notes.find(note => note.id === editingNoteId)?.description || ''}
-                initialContent={notes.find(note => note.id === editingNoteId)?.content || ''}
-                onSubmit={(title, description, content) => handleUpdateNote(editingNoteId, title, description, content)}
-                onCancel={() => setEditingNoteId(null)}
-                isSubmitting={isUpdating}
-                submitButtonText="Update Note"
-                titlePlaceholder="Note Title"
-                descriptionPlaceholder="A brief description of your note (optional)"
-                contentPlaceholder="Start writing your note here..."
-                isCreateMode={false}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        {editingNoteId && (
+          <div className="mb-8">
+            <NoteForm
+              initialTitle={notes.find(note => note.id === editingNoteId)?.title || ''}
+              initialDescription={notes.find(note => note.id === editingNoteId)?.description || ''}
+              initialContent={notes.find(note => note.id === editingNoteId)?.content || ''}
+              onSubmit={(title, description, content) => handleUpdateNote(editingNoteId, title, description, content)}
+              onCancel={() => setEditingNoteId(null)}
+              isSubmitting={isUpdating}
+              submitButtonText="Update Note"
+              titlePlaceholder="Note Title"
+              descriptionPlaceholder="A brief description of your note (optional)"
+              contentPlaceholder="Start writing your note here..."
+              isCreateMode={false}
+            />
+          </div>
+        )}
 
         {/* Notes List */}
         <div className="bg-white rounded-lg shadow-xl p-6">
@@ -351,14 +324,9 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
               <p className="mt-4 text-gray-600">Loading your notes...</p>
             </div>
           ) : notes.length === 0 ? (
-            <motion.div
-              className="text-center py-8 text-gray-500 bg-gray-50 rounded-md"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
+            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
               <p className="text-lg">No notes found. Start by creating your first note above!</p>
-            </motion.div>
+            </div>
           ) : (
             <NotesGrid
               notes={notes}
@@ -376,11 +344,9 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
       </div>
 
       {/* Note Reader Modal */}
-      <AnimatePresence>
-        {selectedNote && (
-          <NoteReader note={selectedNote} onClose={handleCloseReader} />
-        )}
-      </AnimatePresence>
+      {selectedNote && (
+        <NoteReader note={selectedNote} onClose={handleCloseReader} />
+      )}
     </div>
   );
 }

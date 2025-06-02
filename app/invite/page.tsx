@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 
-export default function InvitePage() {
+function InviteContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -152,4 +152,12 @@ export default function InvitePage() {
   }
 
   return null;
+}
+
+export default function InvitePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InviteContent />
+    </Suspense>
+  );
 } 
