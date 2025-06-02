@@ -5,23 +5,15 @@ import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { Note } from '@/types/note';
+import { generatePDF } from '@/utils/pdf';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Download } from 'lucide-react';
 
 // Import reusable components
 import NoteForm from '@/components/usercomponents/NoteForm';
-import NotesGrid from '@/components/usercomponents/NotesGrid';
-import NoteReader from '@/components/usercomponents/NotesReader';
-
-interface Note {
-  id: string;
-  title: string;
-  description: string | null;
-  content: string | null;
-  is_public: boolean; // Ensured this exists
-  created_at: string;
-  updated_at: string | null; // Ensured this exists and allows null
-  user_id: string | null;
-  organization_slug: string | null; // Ensured this exists and allows null
-}
+import NotesGrid from '@/components/notes/NotesGrid';
+import NoteViewer from '@/components/notes/NoteViewer';
 
 export default function Page({ params }: { params: Promise<{ "org-slug": string }> }) {
   const [orgSlug, setOrgSlug] = useState<string>('');
@@ -39,7 +31,8 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [currentUserUid, setCurrentUserUid] = useState<string | null>(null);
-  const [currentUserName, setCurrentUserName] = useState<string | null>(null); // New state for user's name/email
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
 
   const supabase = createClientComponentClient();
   const router = useRouter();
@@ -232,6 +225,56 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
     setSelectedNote(null);
   };
 
+  const handleSelectNote = (noteId: string) => {
+    setSelectedNotes(prev =>
+      prev.includes(noteId)
+        ? prev.filter(id => id !== noteId)
+        : [...prev, noteId]
+    );
+  };
+
+  const handleEditNote = (noteId: string) => {
+    setEditingNoteId(noteId);
+  };
+
+  const handleDownloadNote = async (note: Note) => {
+    try {
+      await generatePDF(note);
+      toast.success('Note downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading note:', error);
+      toast.error('Failed to download note');
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedNotes.length === notes.length) {
+      setSelectedNotes([]);
+      toast.success('All notes deselected');
+    } else {
+      setSelectedNotes(notes.map(note => note.id));
+      toast.success('All notes selected');
+    }
+  };
+
+  const handleDownloadSelected = async () => {
+    if (selectedNotes.length === 0) {
+      toast.error('Please select at least one note to download');
+      return;
+    }
+
+    try {
+      const selectedNotesData = notes.filter(note => selectedNotes.includes(note.id));
+      for (const note of selectedNotesData) {
+        await generatePDF(note);
+      }
+      toast.success('Selected notes downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading notes:', error);
+      toast.error('Failed to download notes');
+    }
+  };
+
   return (
     <div className="min-h-screen p-8 bg-gradient-to-br from-purple-50 to-pink-50 font-sans">
       <div className="max-w-7xl mx-auto">
@@ -248,13 +291,10 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
           </h1>
           <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
             <button
-              onClick={handleExportNotes}
-              className="px-6 py-3 bg-green-600 text-white rounded-full font-semibold shadow-lg hover:bg-green-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
+              onClick={handleSelectAll}
+              className="px-6 py-3 bg-purple-600 text-white rounded-full font-semibold shadow-lg hover:bg-purple-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-              <span>Export All Notes</span>
+              {selectedNotes.length === notes.length ? 'Deselect All' : 'Select All'}
             </button>
             <button
               onClick={handleLogout}
@@ -267,6 +307,31 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
             </button>
           </div>
         </div>
+
+        {/* Selected Notes Popup */}
+        <AnimatePresence>
+          {selectedNotes.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="fixed bottom-8 right-8 bg-white rounded-lg shadow-xl p-4 z-50"
+            >
+              <div className="flex items-center space-x-4">
+                <span className="text-gray-700">
+                  {selectedNotes.length} note{selectedNotes.length !== 1 ? 's' : ''} selected
+                </span>
+                <button
+                  onClick={handleDownloadSelected}
+                  className="px-4 py-2 bg-green-600 text-white rounded-full font-semibold shadow-lg hover:bg-green-700 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download Selected</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Create Note Form Button */}
         {!isCreating && (
@@ -337,15 +402,19 @@ export default function Page({ params }: { params: Promise<{ "org-slug": string 
               isUpdating={isUpdating}
               setIsUpdating={setIsUpdating}
               onNoteClick={handleNoteClick}
+              canEditOrDelete={true}
               currentUserUid={currentUserUid}
+              onDownload={handleDownloadNote}
+              selectedNotes={selectedNotes}
+              onSelectNote={handleSelectNote}
             />
           )}
         </div>
       </div>
 
-      {/* Note Reader Modal */}
+      {/* Note Viewer Modal */}
       {selectedNote && (
-        <NoteReader note={selectedNote} onClose={handleCloseReader} />
+        <NoteViewer note={selectedNote} onClose={handleCloseReader} />
       )}
     </div>
   );

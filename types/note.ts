@@ -7,4 +7,5 @@ export interface Note {
   title: string;
   description: string | null;
   content: string | null;
+  is_public: boolean;
 } 
