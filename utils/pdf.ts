@@ -32,7 +32,11 @@ export async function generatePDF(note: Note) {
   // Add metadata
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(10);
+<<<<<<< HEAD
   const date = new Date(note.updated_at || note.created_at).toLocaleDateString();
+=======
+  const date = new Date(note.updated_at).toLocaleDateString();
+>>>>>>> 4f4fcd5d876077c03f367ce43f308f1bf4611046
   doc.text(`Last updated: ${date}`, 20, 280);
   
   // Save the PDF

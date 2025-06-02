@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 'use client';
 
+=======
+>>>>>>> 4f4fcd5d876077c03f367ce43f308f1bf4611046
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
