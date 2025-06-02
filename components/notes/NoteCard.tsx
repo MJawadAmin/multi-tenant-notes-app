@@ -170,7 +170,7 @@ export default function NoteCard({
       ) : (
         <>
           <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
               <input
                 type="checkbox"
                 checked={isSelected}
@@ -179,13 +179,13 @@ export default function NoteCard({
                   onSelect();
                 }}
                 onClick={(e) => e.stopPropagation()}
-                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                className="w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-green-500 focus:ring-offset-0 cursor-pointer transition-all duration-200 hover:border-green-500 flex-shrink-0"
               />
-              <h3 className="text-2xl font-bold text-gray-800 truncate">
+              <h3 className="text-2xl font-bold text-gray-800 truncate min-w-0 flex-1">
                 {note.title}
               </h3>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 flex-shrink-0 ml-4">
               {onDownload && (
                 <motion.button
                   whileHover={{ scale: 1.1 }}
@@ -224,7 +224,7 @@ export default function NoteCard({
               )}
             </div>
           </div>
-          <p className="text-gray-700 mb-4 flex-grow overflow-hidden whitespace-pre-wrap line-clamp-3">
+          <p className="text-gray-700 mb-4 flex-grow overflow-hidden text-ellipsis break-words whitespace-pre-wrap line-clamp-3">
             {note.description || 'No description provided.'}
           </p>
           <div className="flex justify-between items-center mt-auto text-sm text-gray-500 z-10">
