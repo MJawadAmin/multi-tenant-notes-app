@@ -1,17 +1,8 @@
-// components/usercomponents/NoteCard.tsx
+// components/notes/NoteCard.tsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Edit, Trash2, Save, X, RotateCw } from 'lucide-react';
-
-interface Note {
-  id: string;
-  created_at: string;
-  user_id: string | null;
-  organization_slug: string;
-  title: string;
-  description: string | null;
-  content: string | null;
-}
+import { Edit, Trash2, Save, X, RotateCw, Download } from 'lucide-react';
+import { Note } from '@/types/note';
 
 interface NoteCardProps {
   note: Note;
@@ -25,6 +16,9 @@ interface NoteCardProps {
   // --- ADDED: New prop to control edit/delete visibility ---
   canEditOrDelete: boolean;
   currentUserUid: string | null;
+  onDownload?: () => Promise<void>;
+  isSelected: boolean;
+  onSelect: () => void;
 }
 
 const cardVariants = {
@@ -44,6 +38,9 @@ export default function NoteCard({
   onClick,
   canEditOrDelete, // Destructure the new prop
   currentUserUid,
+  onDownload,
+  isSelected,
+  onSelect,
 }: NoteCardProps) {
   const isEditing = editingNoteId === note.id;
   const [editedTitle, setEditedTitle] = useState(note.title);
@@ -91,6 +88,7 @@ export default function NoteCard({
         flex flex-col justify-between
         transform transition-all duration-400 ease-out
         ${!isEditing ? 'cursor-pointer' : ''}
+        ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
       `}
       style={{
         borderColor: isEditing ? 'rgb(99 102 241)' : 'rgb(209 213 219)',
@@ -171,36 +169,68 @@ export default function NoteCard({
         </div>
       ) : (
         <>
-          <h3 className="text-2xl font-bold text-gray-800 mb-2 truncate">
-            {note.title}
-          </h3>
-          {/* Displaying the dedicated description field */}
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onSelect();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <h3 className="text-2xl font-bold text-gray-800 truncate">
+                {note.title}
+              </h3>
+            </div>
+            <div className="flex space-x-2">
+              {onDownload && (
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDownload();
+                  }}
+                  className="p-2 rounded-full bg-green-500 hover:bg-green-600 text-white transition"
+                  aria-label="Download note"
+                >
+                  <Download size={18} />
+                </motion.button>
+              )}
+              {canEditOrDelete && (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleEditClick}
+                    className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
+                    aria-label="Edit note"
+                  >
+                    <Edit size={18} />
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+                    className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
+                    aria-label="Delete note"
+                  >
+                    <Trash2 size={18} />
+                  </motion.button>
+                </>
+              )}
+            </div>
+          </div>
           <p className="text-gray-700 mb-4 flex-grow overflow-hidden whitespace-pre-wrap line-clamp-3">
-            {note.description || 'No description provided.'} {/* Display description, not content */}
+            {note.description || 'No description provided.'}
           </p>
           <div className="flex justify-between items-center mt-auto text-sm text-gray-500 z-10">
             <span>Created: {new Date(note.created_at).toLocaleDateString()}</span>
-            {canEditOrDelete && (
-              <div className="flex space-x-2">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleEditClick}
-                  className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition"
-                  aria-label="Edit note"
-                >
-                  <Edit size={18} />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-                  className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
-                  aria-label="Delete note"
-                >
-                  <Trash2 size={18} />
-                </motion.button>
-              </div>
+            {note.updated_at && (
+              <span>Updated: {new Date(note.updated_at).toLocaleDateString()}</span>
             )}
           </div>
         </>
